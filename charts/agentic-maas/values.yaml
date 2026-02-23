@@ -1,0 +1,22 @@
+replicaCount: 1
+
+image:
+  repository: agentic-maas
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+env:
+  UVICORN_HOST: "0.0.0.0"
+  UVICORN_PORT: "8000"
