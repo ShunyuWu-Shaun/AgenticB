@@ -1,0 +1,7 @@
+{
+  "scene_id": "synthetic-energy",
+  "scenario_type": "efficiency",
+  "tags": ["synthetic", "demo"],
+  "granularity_sec": 60,
+  "execution_window_sec": 300
+}

@@ -1,0 +1,11 @@
+{
+  "values": {
+    "energy_cost": 100.0,
+    "steam_flow": 32.0,
+    "boiler_temp": 560.0,
+    "efficiency": 0.82
+  },
+  "metadata": {
+    "source": "synthetic"
+  }
+}

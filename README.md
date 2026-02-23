@@ -1,143 +1,144 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="agentic-maas logo" width="220" />
+  <img src="assets/logo.svg" alt="EasyShift-MaaS logo" width="220" />
 </p>
 
-<h1 align="center">agentic-maas</h1>
-<p align="center"><strong>工业 B 端 Agentic MaaS 端到端迁移开源库</strong></p>
+<h1 align="center">EasyShift-MaaS</h1>
+<p align="center"><strong>面向 To-B 的 MAAS 迁移型 Agentic + 预测-优化可复用框架</strong></p>
 
 <p align="center">
-  Python-first | Edge Runtime + Cloud Control Plane | Human-in-the-loop Approval
+  Migration-first | Reusable Prediction-Optimization Pattern | Python SDK + FastAPI
 </p>
 
-## 这是什么
-`agentic-maas` 是一个面向工业/IoT B 端场景的开源框架，目标是把传统算法与异构现场测点，迁移到可治理、可灰度、可回滚的 Agentic + LLM 体系。
+## 1. 项目定位
+EasyShift-MaaS 聚焦于 **MAAS 功能迁移的基础能力**，目标是在不同 To-B 场景中快速复用“预测-优化”模式，而不是绑定某个行业的专有逻辑。
 
-它重点解决两件事：
-- 物理系统传感器测点配置迁移（OPC UA / Modbus / MQTT）
-- 传统规则/算法向 Agentic 工作流的分层自适应迁移
+本项目强调两件事：
+- **可迁移性**：通过模板化和 Agentic 迁移助手，把旧场景配置迁移到新场景。
+- **可复用性**：通过标准化四层内核（Data Contract / Predictor / Optimizer / Guardrail）复用算法工作流。
 
-## 核心特性
-- 统一数据模型：`SensorPoint`、`MigrationSpec`、`DecisionAction`、`EvalReport` 等
-- 协议接入适配器：`opcua`、`modbus`、`mqtt`
-- MaaS Provider SPI：兼容本地私有与国产模型网关（vLLM / Qwen / DeepSeek）
-- 迁移引擎：映射、单位换算、质量校验、差异报告
-- 评测与门禁：离线回放 + 质量阈值阻断
-- 分层自适应：离线校准 + 在线 Thompson Sampling
-- 安全上线：人在环审批 + 白名单策略 + 灰度发布 + 一键回滚
+## 2. 安全与合规声明
+- 本仓库仅包含通用框架和**合成示例**。
+- 不包含任何商用 demo 的代码、数据、参数、模型或规则文本。
+- 内置非泄漏扫描（CI + 本地脚本）用于阻止敏感资产误提交。
 
-## 架构概览
+## 3. 核心能力
+- 四层内核：`Data Contract + Predictor + Optimizer + Guardrail`
+- 场景模板：`ScenarioTemplate` 版本化发布、JSON/YAML 导入导出
+- 迁移助手：`SceneMetadata + FieldDictionary + NL Requirements -> MigrationDraft`
+- 迁移校验：正确性评分、约束冲突率、守护规则覆盖率
+- 回归规划：自动生成合成回归用例
+- 服务入口：FastAPI 主线接口覆盖模板生成/校验/发布与 pipeline 仿真/评测
+
+## 4. 架构概览
 ```mermaid
 flowchart LR
-  subgraph Edge["Edge Runtime"]
-    I["Protocol Ingestion\nOPC UA / Modbus / MQTT"] --> M["Migration Mapping"]
-    M --> A["Agentic Runtime\nPerceive -> Analyze -> Decide"]
-    A --> T["Approval Ticket"]
+  A["Scene Metadata + Field Dictionary + NL Requirements"] --> B["Migration Assistant"]
+  B --> C["Migration Draft"]
+  C --> D["Template Validator"]
+  D --> E["ScenarioTemplate Repository"]
+  E --> F["Prediction-Optimization Pipeline"]
+
+  subgraph Core["Core Layer"]
+    P["Predictor"] --> O["Optimizer"] --> G["Guardrail"]
   end
 
-  subgraph Cloud["Cloud Control Plane"]
-    C1["Migration Orchestrator"]
-    C2["Replay Evaluation"]
-    C3["Quality Gate + Canary"]
-    C4["Rollback Manager"]
-    C5["Audit + Observability"]
-  end
-
-  T --> C3
-  C2 --> C3
-  C3 --> C4
-  C1 --> M
-  C5 --> C1
+  F --> Core
+  F --> R["Simulation/Evaluation Report"]
 ```
 
-## 目录结构
+## 5. 包结构
 ```text
-.
-├── assets/
-│   └── logo.svg
-├── src/agentic_maas/
-│   ├── api/            # FastAPI 控制面
-│   ├── ingestion/      # 协议适配器与注册
-│   ├── migration/      # 测点迁移与算法模板映射
-│   ├── evaluation/     # 回放评测与门禁
-│   ├── adaptation/     # 校准与 bandit
-│   ├── approval/       # 审批网关
-│   ├── deployment/     # 灰度与回滚
-│   ├── providers/      # 模型 provider 抽象
-│   ├── runtime/        # Agent 状态机运行时
-│   └── store/          # 存储层（当前内存实现）
-├── tests/
-├── docker-compose.yml
-└── charts/agentic-maas/
+src/easyshift_maas/
+├── core/
+│   ├── contracts.py
+│   ├── predictor.py
+│   ├── optimizer.py
+│   ├── guardrail.py
+│   └── pipeline.py
+├── agentic/
+│   ├── migration_assistant.py
+│   ├── template_validator.py
+│   └── regression_planner.py
+├── templates/
+│   ├── schema.py
+│   └── repository.py
+├── api/
+│   └── app.py
+├── examples/
+│   ├── synthetic_templates.py
+│   └── data/
+└── cli.py
 ```
 
-## 快速开始
-### 1) 环境
+## 6. 快速开始
+### 6.1 环境
 - Python 3.11+
-- 可选：Docker（用于本地一键运行控制面）
 
-### 2) 安装
+### 6.2 安装
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
 ```
 
-### 3) 启动控制面
+### 6.3 启动 API
 ```bash
-uvicorn agentic_maas.api.app:app --reload --port 8000
+uvicorn easyshift_maas.api.app:app --reload --port 8000
 ```
 
-### 4) 运行测试
+### 6.4 运行测试
 ```bash
 pytest
 ```
 
-## API 一览
-- `POST /v1/migrations` 创建迁移任务
-- `GET /v1/migrations/{id}` 查询迁移任务
-- `POST /v1/evals/replay` 启动离线回放评测
-- `POST /v1/deployments/canary` 发起灰度发布
-- `POST /v1/approvals/{ticket_id}/approve` 审批动作
-- `POST /v1/deployments/{id}/rollback` 执行回滚
-
-补充端点：
-- `POST /v1/approvals` 创建审批单
-- `POST /v1/ingestion/{protocol}/discover` 发现测点
+## 7. API 主线
+- `POST /v1/templates/generate` 生成迁移草案
+- `POST /v1/templates/validate` 校验迁移草案
+- `POST /v1/templates/publish` 发布模板版本
+- `GET /v1/templates/{template_id}` 获取模板详情
+- `POST /v1/pipeline/simulate` 单次仿真
+- `POST /v1/pipeline/evaluate` 批量评测
 - `GET /health` 健康状态
 
-## CLI 示例
-输出示例测点 JSON：
+## 8. CLI 示例
+输出合成模板：
 ```bash
-python -m agentic_maas.cli sample-points
+easyshift-maas sample-template --variant energy
 ```
 
-从测点草拟映射规则：
+生成迁移草案：
 ```bash
-python -m agentic_maas.cli draft-mapping --points ./points.json
+easyshift-maas generate-draft \
+  --metadata ./src/easyshift_maas/examples/data/scene_metadata.json \
+  --fields ./src/easyshift_maas/examples/data/field_dictionary.json \
+  --requirement "prioritize stability"
 ```
 
-执行映射并查看差异：
+校验迁移草案：
 ```bash
-python -m agentic_maas.cli apply-mapping --points ./points.json --rules ./rules.json
+easyshift-maas validate-draft --draft ./draft.json
 ```
 
-## 设计原则
-- 安全优先：默认人在环，不做无审批自动控制写入
-- 渐进迁移：先兼容 baseline，再逐步引入 Agentic 策略
-- 可运维：评测门禁、灰度发布、审计追踪、可回滚
-- 去供应商锁定：统一 Provider SPI
+运行仿真：
+```bash
+easyshift-maas simulate \
+  --template ./template.json \
+  --context ./src/easyshift_maas/examples/data/context.json
+```
 
-## 路线图
-- [x] v0.1：核心类型、SPI、控制面主 API、三协议适配器、迁移/评测/审批/灰度/回滚
-- [ ] v0.2：PostgreSQL/TimescaleDB 与 NATS 持久化与消息流实现
-- [ ] v0.3：LangGraph 工作流深度集成、策略模板市场、行业 Demo
-- [ ] v1.0：生产级多租户、审计增强、SLO/SLA 套件
+## 9. 迁移说明（破坏性切换）
+本版本采用破坏性切换：
+- 包名：`agentic_maas` -> `easyshift_maas`
+- API 主线：旧迁移/部署路由切换为模板与仿真评测路由
+- 数据契约：切换到 `ScenarioTemplate` / `MigrationDraft` / `MigrationValidationReport`
 
-## 贡献
-欢迎提交 Issue / PR。建议先讨论：
-- 场景需求（设备类型、时延要求、风险等级）
-- 协议兼容性（OPC UA/Modbus 细分实现差异）
-- 模型生态（私有化部署约束、国产模型接入方式）
+详细见：`docs/MIGRATION_GUIDE.md`
 
-## License
+## 10. 开发与质量门禁
+- 单元测试：`tests/unit`
+- 契约测试：`tests/contract`
+- 端到端测试：`tests/e2e`
+- 敏感扫描：`python tools/sensitive_scan.py`
+
+## 11. License
 Apache-2.0

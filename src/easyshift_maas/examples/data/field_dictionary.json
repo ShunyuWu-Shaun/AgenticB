@@ -1,0 +1,41 @@
+{
+  "fields": [
+    {
+      "field_name": "energy_cost",
+      "semantic_label": "cost",
+      "unit": "$/h",
+      "dimension": "dimensionless",
+      "observable": true,
+      "controllable": false,
+      "missing_strategy": "required"
+    },
+    {
+      "field_name": "steam_flow",
+      "semantic_label": "flow_rate",
+      "unit": "t/h",
+      "dimension": "dimensionless",
+      "observable": true,
+      "controllable": true,
+      "missing_strategy": "required"
+    },
+    {
+      "field_name": "boiler_temp",
+      "semantic_label": "temperature",
+      "unit": "C",
+      "dimension": "dimensionless",
+      "observable": true,
+      "controllable": true,
+      "missing_strategy": "required"
+    },
+    {
+      "field_name": "efficiency",
+      "semantic_label": "efficiency",
+      "unit": "ratio",
+      "dimension": "dimensionless",
+      "observable": true,
+      "controllable": false,
+      "missing_strategy": "required"
+    }
+  ],
+  "alias_map": {}
+}
