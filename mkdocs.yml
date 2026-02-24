@@ -1,0 +1,62 @@
+site_name: EasyShift-MaaS Documentation
+site_description: Migration-centric Agentic + reusable prediction-optimization framework for industrial MaaS scenarios
+site_url: https://shunyuwu-shaun.github.io/AgenticB/
+repo_url: https://github.com/ShunyuWu-Shaun/AgenticB
+repo_name: ShunyuWu-Shaun/AgenticB
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - 首页: index.md
+  - 快速开始:
+      - 项目定位: getting-started/overview.md
+      - 安装与启动: getting-started/installation.md
+      - 10分钟上手: getting-started/quickstart.md
+      - 第一份迁移草案: getting-started/first-migration-draft.md
+  - 核心概念:
+      - 问题定义与预期效果: concepts/problem-and-outcome.md
+      - 架构与运行逻辑: concepts/architecture.md
+      - 迁移草案定义: concepts/migration-draft.md
+      - 模板正确性与质量门禁: concepts/template-quality.md
+      - 术语表（去抽象化）: concepts/glossary.md
+  - 教程:
+      - 标准YAML工业流程: tutorials/industrial-standard-yaml.md
+      - Legacy YAML迁移: tutorials/legacy-yaml-migration.md
+      - 集成现有预测模型: tutorials/integrate-existing-model.md
+      - 调参与故障排查: tutorials/debugging-and-tuning.md
+  - 参考:
+      - HTTP API: reference/http-api.md
+      - Python SDK扩展点: reference/python-sdk.md
+      - CLI命令: reference/cli.md
+      - YAML规范: reference/yaml-spec.md
+      - 错误码与处理建议: reference/error-codes.md
+  - 部署与安全:
+      - Docker Compose: deployment/docker-compose.md
+      - Helm: deployment/helm.md
+      - Nuitka打包: deployment/nuitka.md
+      - 安全基线: deployment/security-baseline.md
+  - FAQ: faq.md
+  - 路线图: roadmap.md

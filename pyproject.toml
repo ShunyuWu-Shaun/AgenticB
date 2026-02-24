@@ -29,6 +29,11 @@ dev = [
 build = [
   "nuitka>=2.5.0,<3.0.0",
 ]
+docs = [
+  "mkdocs>=1.6.0,<2.0.0",
+  "mkdocs-material>=9.5.0,<10.0.0",
+  "pymdown-extensions>=10.0.0,<11.0.0",
+]
 
 [project.scripts]
 easyshift-maas-api = "easyshift_maas.api.app:run"
