@@ -1,0 +1,28 @@
+[
+  {
+    "context": {
+      "values": {
+        "energy_cost": 120.0,
+        "reactor_temp": 520.0,
+        "reactor_pressure": 9.5
+      },
+      "metadata": {
+        "batch": "A"
+      }
+    },
+    "expected_approved": true
+  },
+  {
+    "context": {
+      "values": {
+        "energy_cost": 135.0,
+        "reactor_temp": 560.0,
+        "reactor_pressure": 10.2
+      },
+      "metadata": {
+        "batch": "B"
+      }
+    },
+    "expected_approved": true
+  }
+]

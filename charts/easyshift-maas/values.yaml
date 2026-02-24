@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: easyshift-maas
-  tag: "0.1.0"
+  tag: "0.2.0"
   pullPolicy: IfNotPresent
 
 service:
@@ -16,3 +16,11 @@ resources:
   requests:
     cpu: 200m
     memory: 256Mi
+
+secrets:
+  redisConnEnv: EASYSHIFT_REDIS_CONN
+  redisConnSecretName: ""
+  redisConnSecretKey: ""
+  mysqlConnEnv: EASYSHIFT_MYSQL_CONN
+  mysqlConnSecretName: ""
+  mysqlConnSecretKey: ""

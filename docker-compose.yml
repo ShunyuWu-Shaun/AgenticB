@@ -2,10 +2,58 @@ version: "3.9"
 
 services:
   easyshift-api:
-    image: python:3.11-slim
-    working_dir: /app
-    volumes:
-      - ./:/app
-    command: sh -c "pip install -e . && uvicorn easyshift_maas.api.app:app --host 0.0.0.0 --port 8000"
+    build:
+      context: .
+      target: runtime
+    container_name: easyshift-api
+    depends_on:
+      - redis
+      - mysql
+    command:
+      - sh
+      - -c
+      - |
+        export EASYSHIFT_REDIS_CONN="$(cat /run/secrets/redis_conn)" && \
+        export EASYSHIFT_MYSQL_CONN="$(cat /run/secrets/mysql_conn)" && \
+        uvicorn easyshift_maas.api.app:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
+    secrets:
+      - redis_conn
+      - mysql_conn
+
+  redis:
+    image: redis:7-alpine
+    container_name: easyshift-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+
+  mysql:
+    image: mysql:8.4
+    container_name: easyshift-mysql
+    environment:
+      MYSQL_DATABASE: easyshift
+      MYSQL_USER: easyshift
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    ports:
+      - "3306:3306"
+    secrets:
+      - mysql_password
+      - mysql_root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+secrets:
+  redis_conn:
+    file: ./deploy/secrets/redis_conn.json
+  mysql_conn:
+    file: ./deploy/secrets/mysql_conn.json
+  mysql_password:
+    file: ./deploy/secrets/mysql_password.txt
+  mysql_root_password:
+    file: ./deploy/secrets/mysql_root_password.txt
+
+volumes:
+  mysql_data:

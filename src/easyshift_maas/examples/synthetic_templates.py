@@ -67,6 +67,8 @@ def build_energy_efficiency_template() -> ScenarioTemplate:
             rules=[
                 GuardrailRule(field_name="boiler_temp", min_value=250.0, max_value=900.0, max_delta=60.0, action=GuardrailAction.REJECT),
                 GuardrailRule(field_name="steam_flow", min_value=0.0, max_delta=8.0, action=GuardrailAction.CLIP),
+                GuardrailRule(field_name="energy_cost", min_value=0.0, max_delta=25.0, action=GuardrailAction.CLIP),
+                GuardrailRule(field_name="efficiency", min_value=0.0, max_value=1.0, max_delta=0.08, action=GuardrailAction.CLIP),
             ]
         ),
         notes="Synthetic template for energy-efficiency tradeoff.",
@@ -120,6 +122,8 @@ def build_quality_stability_template() -> ScenarioTemplate:
             rules=[
                 GuardrailRule(field_name="pressure", min_value=2.0, max_value=18.0, max_delta=2.0, action=GuardrailAction.REJECT),
                 GuardrailRule(field_name="line_speed", min_value=8.0, max_value=80.0, max_delta=10.0, action=GuardrailAction.CLIP),
+                GuardrailRule(field_name="quality_index", min_value=0.0, max_value=1.0, max_delta=0.1, action=GuardrailAction.CLIP),
+                GuardrailRule(field_name="rework_rate", min_value=0.0, max_value=1.0, max_delta=0.1, action=GuardrailAction.CLIP),
             ]
         ),
         notes="Synthetic template focused on quality-stability balance.",

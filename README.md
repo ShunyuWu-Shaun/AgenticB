@@ -3,363 +3,253 @@
 </p>
 
 <h1 align="center">EasyShift-MaaS</h1>
-<p align="center"><strong>面向 To-B 的 MAAS 迁移型 Agentic + 预测-优化可复用框架</strong></p>
+<p align="center"><strong>迁移型 Agentic + 预测-优化可复用框架（工业场景 v0.2）</strong></p>
 
 <p align="center">
-  Migration-first | Reusable Prediction-Optimization Pattern | Python SDK + FastAPI
+  YAML point catalog | Redis/MySQL indexing | Quality gates | Docker + Nuitka
 </p>
 
-## 1. 这个库解决什么问题
-EasyShift-MaaS 解决的是：
-- 如何把一个场景里的“预测-优化”模式，迁移到另一个场景。
-- 如何把迁移过程标准化，减少手工改配置和出错成本。
+## 1. 定位与边界
+EasyShift-MaaS 面向 B 端 MAAS 迁移场景，核心目标是：
+- 把工业现场点位 YAML 配置，标准化为可版本化 `PointCatalog`。
+- 把“预测-优化”逻辑收敛到统一 `ScenarioTemplate` 契约。
+- 通过 `TemplateValidator + TemplateQualityEvaluator` 实现可解释门禁。
 
-它把系统拆成两条主线：
-- 迁移主线：`Generate Draft -> Validate -> Publish Template`
-- 执行主线：`Simulate/Evaluate`（预测 -> 优化 -> 守护）
+默认不做自动闭环控制下发，只输出仿真结果与受守护规则约束的推荐值。
 
-它默认不做自动闭环控制下发，只做可迁移性和可复用性的基础能力。
-
-## 2. 基本运行逻辑（时序图）
+## 2. 运行主线（时序图）
 ```mermaid
 sequenceDiagram
   autonumber
-  participant U as User/Client
+  participant U as User
   participant API as FastAPI
+  participant CL as CatalogLoader
+  participant CR as CatalogRepo
+  participant SP as SnapshotProvider
   participant MA as MigrationAssistant
   participant TV as TemplateValidator
-  participant TR as TemplateRepository
-  participant PL as PredictionOptimizationPipeline
-  participant P as Predictor
-  participant O as Optimizer
-  participant G as Guardrail
+  participant TQ as TemplateQuality
+  participant TR as TemplateRepo
+  participant PL as Pipeline
 
-  U->>API: POST /v1/templates/generate\n(scene_metadata + field_dictionary + nl_requirements)
+  U->>API: POST /v1/catalogs/import (yaml_text/yaml_path, mode)
+  API->>CL: load(standard|legacy)
+  CL-->>API: PointCatalog + FieldDictionary + warnings
+  API->>CR: put(catalog)
+  API-->>U: catalog_id, binding_count
+
+  U->>API: POST /v1/contexts/build (catalog_id)
+  API->>CR: get(catalog)
+  API->>SP: fetch(snapshot_request, catalog, redis/mysql profiles)
+  SP-->>API: SnapshotResult(values, missing, quality_flags)
+  API-->>U: SceneContext + SnapshotResult
+
+  U->>API: POST /v1/templates/generate (scene_metadata + field_dictionary + nl_requirements)
   API->>MA: generate(...)
-  MA-->>API: MigrationDraft(confidence, risks, pending_confirmations)
+  MA-->>API: MigrationDraft
   API-->>U: draft
 
-  U->>API: POST /v1/templates/validate\n(MigrationDraft)
+  U->>API: POST /v1/templates/validate
   API->>TV: validate(draft)
   TV-->>API: MigrationValidationReport
-  API-->>U: validation_report
+  API-->>U: report
 
-  U->>API: POST /v1/templates/publish\n(draft, validate_before_publish=true)
+  U->>API: POST /v1/templates/quality-check
+  API->>TQ: evaluate(template, gate, regression_samples)
+  TQ-->>API: TemplateQualityReport
+  API-->>U: quality report
+
+  U->>API: POST /v1/templates/publish
   API->>TV: validate(draft)
-  alt validation pass
+  API->>TQ: quality gate check
+  alt pass
     API->>TR: publish(template)
-    TR-->>API: persisted template
     API-->>U: template_id/version
-  else validation fail
-    API-->>U: 400 + validation detail
+  else fail
+    API-->>U: 400 + detailed report
   end
 
-  U->>API: POST /v1/pipeline/simulate\n(template_id or inline_template + scene_context)
+  U->>API: POST /v1/pipeline/simulate or /evaluate
   API->>PL: run(context, template)
-  PL->>P: predict(context, prediction_spec)
-  P-->>PL: PredictionResult
-  PL->>O: solve(prediction, objective, constraints, optimization)
-  O-->>PL: OptimizationPlan
-  PL->>G: validate(plan, context, guardrail)
-  G-->>PL: GuardrailDecision
-  PL-->>API: PipelineResult
-  API-->>U: simulation result
-
-  U->>API: POST /v1/pipeline/evaluate\n(samples)
-  API->>PL: run(...) for each sample
-  API-->>U: EvaluationReport
+  PL-->>API: PipelineResult / EvaluationReport
+  API-->>U: result
 ```
 
-## 3. 架构与目录
+## 3. 核心工具与作用映射
+- `FastAPI`: 对外 API 入口（模板迁移、质量门禁、仿真评测）。
+- `Pydantic v2`: 全部契约类型与 schema 校验。
+- `YamlCatalogLoader`: 双模式 YAML（standard/legacy）解析。
+- `CompositeSnapshotProvider`: Redis/MySQL 批量点位读取与归一化。
+- `ChainedSecretResolver`: `env:` / `file:` 密钥注入。
+- `TemplateValidator`: 结构与约束冲突校验。
+- `TemplateQualityEvaluator`: 五层质量评分（结构/语义/可解/守护/回归）。
+- `PredictionOptimizationPipeline`: Predictor -> Optimizer -> Guardrail 执行链。
+- `Docker + Compose`: 本地联调（API + Redis + MySQL + secrets）。
+- `Nuitka`: 产出 CLI/API 单文件可执行。
+
+## 4. 项目结构
 ```text
 src/easyshift_maas/
 ├── core/
-│   ├── contracts.py
-│   ├── predictor.py
-│   ├── optimizer.py
-│   ├── guardrail.py
-│   └── pipeline.py
+├── ingestion/
+│   ├── catalog_loader.py
+│   ├── snapshot_provider.py
+│   ├── repository.py
+│   └── providers/{redis_provider.py,mysql_provider.py}
+├── security/secrets.py
+├── quality/template_quality.py
 ├── agentic/
-│   ├── migration_assistant.py
-│   ├── template_validator.py
-│   └── regression_planner.py
 ├── templates/
-│   ├── schema.py
-│   └── repository.py
-├── api/
-│   └── app.py
-├── examples/
-│   ├── synthetic_templates.py
-│   └── data/
-└── cli.py
+├── api/app.py
+├── cli.py
+└── examples/data/
 ```
 
-## 4. 安装和启动
-### 4.1 环境
-- Python 3.11+
-
-### 4.2 安装
+## 5. 快速开始
+### 5.1 本地 Python 运行
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .[dev]
-```
-
-### 4.3 启动 API
-```bash
+pip install -e '.[dev]'
 uvicorn easyshift_maas.api.app:app --reload --port 8000
 ```
 
-### 4.4 运行测试
+### 5.2 Docker 联调（含 Redis/MySQL）
 ```bash
-pytest
+docker compose up --build
 ```
+默认开发 secrets 位于 `deploy/secrets/`，仅用于本地演示。
 
-## 5. API 使用手册（输入、输出、含义）
-
-### 5.1 `POST /v1/templates/generate`
-用途：从场景元数据和字段字典生成迁移草案。
-
-输入最小结构：
-```json
+### 5.3 5 分钟工业路径
+1. 导入 catalog（标准 YAML）：
+```bash
+curl -X POST http://127.0.0.1:8000/v1/catalogs/import \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"standard","yaml_path":"./src/easyshift_maas/examples/data/catalog_standard.yaml"}'
+```
+2. 构建上下文（从 Redis/MySQL 拉取点位快照）：
+```bash
+curl -X POST http://127.0.0.1:8000/v1/contexts/build \
+  -H 'Content-Type: application/json' \
+  -d '{"catalog_id":"demo-line-catalog","missing_policy":"zero"}'
+```
+3. 生成迁移草案：
+```bash
+curl -X POST http://127.0.0.1:8000/v1/templates/generate \
+  -H 'Content-Type: application/json' \
+  -d @- <<'JSON'
 {
-  "scene_metadata": {
-    "scene_id": "line-A",
-    "scenario_type": "generic",
-    "tags": ["synthetic"],
-    "granularity_sec": 60,
-    "execution_window_sec": 300
-  },
+  "scene_metadata": {"scene_id":"demo-line","scenario_type":"optimization","tags":["synthetic"],"granularity_sec":60,"execution_window_sec":300},
   "field_dictionary": {
     "fields": [
-      {
-        "field_name": "energy_cost",
-        "semantic_label": "cost",
-        "unit": "$/h",
-        "dimension": "dimensionless",
-        "observable": true,
-        "controllable": false,
-        "missing_strategy": "required"
-      }
+      {"field_name":"energy_cost","semantic_label":"cost","unit":"$/h","dimension":"dimensionless","observable":true,"controllable":false,"missing_strategy":"required"},
+      {"field_name":"reactor_temp","semantic_label":"temperature","unit":"C","dimension":"dimensionless","observable":true,"controllable":true,"missing_strategy":"required"}
     ],
     "alias_map": {}
   },
-  "nl_requirements": ["prioritize stability"]
+  "nl_requirements": ["prioritize safety and stability"]
+}
+JSON
+```
+4. 校验 + 质量检查 + 发布：
+```bash
+# /v1/templates/validate
+# /v1/templates/quality-check
+# /v1/templates/publish
+```
+5. 执行 `/v1/pipeline/simulate` 或 `/v1/pipeline/evaluate`。
+
+## 6. 输入规范
+### 6.1 standard YAML（推荐）
+见 `src/easyshift_maas/examples/data/catalog_standard.yaml`，核心块：
+- `scene`
+- `datasources`
+- `point_catalog.bindings`
+- `field_dictionary`
+- `template_override(optional)`
+
+### 6.2 legacy YAML（兼容）
+见 `src/easyshift_maas/examples/data/catalog_legacy.yaml`，兼容特征：
+- 顶层大量点位键（自动识别为 `PointBinding`）。
+- `redis_config/mysql_config` 自动提取为 datasource profile 草案。
+- 输出附带 `pending_confirmations`，提示人工确认映射。
+
+### 6.3 关键 API 输入
+- `POST /v1/catalogs/import`: `yaml_text | yaml_path` 二选一 + `mode`。
+- `POST /v1/contexts/build`: `catalog_id` + `missing_policy` + 可选 `fields`。
+- `POST /v1/templates/quality-check`: `draft | template` 二选一 + `gate`。
+
+## 7. 输出规范
+### 7.1 `SnapshotResult`
+```json
+{
+  "values": {"reactor_temp": 520.0},
+  "quality_flags": {"reactor_temp": "ok"},
+  "missing_fields": [],
+  "source_latency_ms": {"redis": 12},
+  "collected_at": "2026-02-24T10:00:00Z"
 }
 ```
 
-输出关键字段：
+### 7.2 `MigrationDraft`
+包含 `template/confidence/risks/pending_confirmations/generation_strategy`。
+
+### 7.3 `TemplateQualityReport`
 ```json
 {
-  "draft_id": "draft-...",
-  "template": {"template_id": "line-A-template", "version": "draft-1", "...": "..."},
-  "confidence": 0.75,
-  "pending_confirmations": ["..."],
-  "risks": [{"code": "...", "message": "...", "severity": "warn"}],
-  "generation_strategy": "rule_only_low_confidence"
-}
-```
-
-解释：
-- `confidence`：草案可信度。
-- `generation_strategy`：生成策略（规则、混合、低置信度回退）。
-- `pending_confirmations`：必须人工确认的项。
-
-### 5.2 `POST /v1/templates/validate`
-用途：校验草案是否可发布。
-
-输入：完整 `MigrationDraft`。
-
-输出关键字段：
-```json
-{
-  "draft_id": "draft-...",
-  "valid": true,
-  "correctness_score": 0.98,
-  "conflict_rate": 0.0,
+  "overall_score": 0.97,
+  "structural_score": 1.0,
+  "semantic_score": 1.0,
+  "solvability_score": 0.96,
   "guardrail_coverage": 1.0,
+  "regression_score": 0.91,
+  "passed": true,
   "issues": []
 }
 ```
 
-解释：
-- `valid=true` 才建议发布。
-- 内部门槛：正确性 >= 0.95、冲突率 <= 0.02、守护覆盖率 >= 0.95。
+### 7.4 `PipelineResult`
+输出预测、优化计划、守护裁决、最终推荐值和 `executed`。
 
-### 5.3 `POST /v1/templates/publish`
-用途：发布模板到仓储。
+## 8. 模板正确性定义
+质量门禁由五层组成：
+1. 结构正确性：schema/类型/唯一性。
+2. 语义正确性：目标/约束/特征/守护字段可解析。
+3. 可解性：求解器在回归样本上可解。
+4. 安全覆盖：objective + controllable 字段的守护覆盖率。
+5. 回归表现：期望匹配率与违例率。
 
-输入：
-```json
-{
-  "draft": {"...": "完整 MigrationDraft"},
-  "validate_before_publish": true
-}
-```
+默认阈值：
+- `structural >= 0.98`
+- `semantic >= 0.98`
+- `solvability >= 0.95`
+- `guardrail >= 0.95`
+- `regression >= 0.90`
+- `overall >= 0.95`
 
-成功输出：
-```json
-{
-  "template_id": "line-A-template",
-  "version": "draft-1",
-  "validation": {"valid": true, "...": "..."}
-}
-```
+## 9. 问题排查与调参
+- `400 migration draft failed validation`: 先看 `detail.report.issues`，修字段引用和约束冲突。
+- `400 template failed quality gate`: 调整 `ObjectiveSpec`、`ConstraintSpec`、`GuardrailSpec`，或补充 `regression_samples`。
+- `400 missing fields in snapshot`: 使用 `missing_policy=zero/drop` 或修 datasource 连接。
+- `404 catalog/template not found`: 先执行 import/publish。
+- 点位规模大（1k-5k）: 调大 `DataSourceOptions.batch_size`，优化数据源索引列。
 
-失败输出（400）：
-- `migration draft failed validation`
-- 同时返回详细 `report`。
+## 10. 部署与安全
+- 配置连接：`conn_ref` 支持 `env:KEY`、`file:/path/to/secret.json`。
+- 传输加密：Redis/MySQL profile 支持 `tls=true`。
+- 容器密钥注入：`docker-compose.yml` 使用 Docker secrets。
+- Helm: `charts/easyshift-maas/values.yaml` 支持 secretKeyRef 映射。
+- 可执行分发：先 `pip install '.[build]'`，再运行 `scripts/build_nuitka.sh` 生成 `dist/easyshift-maas` 与 `dist/easyshift-maas-api`。
 
-### 5.4 `GET /v1/templates/{template_id}`
-用途：获取已发布模板。
+## 11. 非泄漏声明
+- 示例、测试、文档全部使用 synthetic 数据。
+- 仓库不包含任何商用 demo 资产。
+- CI 保留敏感模式扫描：`tools/sensitive_scan.py`。
 
-输入：
-- 路径参数：`template_id`
-- 可选查询参数：`version`
+## 12. 相关文档
+- `docs/ARCHITECTURE.md`
+- `docs/API.md`
+- `docs/MIGRATION_GUIDE.md`
 
-输出：`ScenarioTemplate`。
-
-### 5.5 `POST /v1/pipeline/simulate`
-用途：执行一次预测-优化仿真。
-
-输入要求：
-- 必须二选一：`template_id` 或 `inline_template`。
-- 同时提供 `scene_context`。
-
-输入示例（按 `template_id`）：
-```json
-{
-  "template_id": "line-A-template",
-  "scene_context": {
-    "values": {"energy_cost": 100.0, "boiler_temp": 560.0},
-    "metadata": {}
-  }
-}
-```
-
-输出关键字段：
-```json
-{
-  "template_id": "line-A-template",
-  "prediction": {"predictions": {"...": 0.0}, "model_signature": "...", "diagnostics": {}},
-  "plan": {"recommended_setpoints": {"...": 0.0}, "objective_value": 0.0, "solver_status": "solved", "diagnostics": {}},
-  "guardrail": {"approved": true, "violations": [], "action": "warn", "adjusted_setpoints": {"...": 0.0}},
-  "final_setpoints": {"...": 0.0},
-  "executed": true
-}
-```
-
-### 5.6 `POST /v1/pipeline/evaluate`
-用途：批量样本评测。
-
-输入示例：
-```json
-{
-  "scenario_id": "eval-1",
-  "template_id": "line-A-template",
-  "samples": [
-    {
-      "context": {"values": {"energy_cost": 100.0, "boiler_temp": 560.0}, "metadata": {}},
-      "expected_approved": true
-    }
-  ]
-}
-```
-
-输出：
-```json
-{
-  "scenario_id": "eval-1",
-  "total_runs": 1,
-  "approval_rate": 1.0,
-  "mean_objective": -12.3,
-  "violation_rate": 0.0,
-  "expectation_match_rate": 1.0
-}
-```
-
-### 5.7 `GET /health`
-输出组件状态与当前内存模板数量。
-
-## 6. 如果有问题，怎么调整
-
-### 6.1 发布时返回 `400 migration draft failed validation`
-怎么查：看返回里的 `validation.report.issues`。
-怎么改：
-- `OBJ_FIELD_UNKNOWN`：目标字段不在 `field_dictionary` 中，先修字段字典。
-- `PRED_FEATURE_UNKNOWN`：预测特征不在字段字典中，修 `prediction.feature_fields`。
-- `CONSTRAINT_CONFLICT_*`：约束冲突，重排边界或调整 hard/soft。
-
-### 6.2 返回 `422`（请求校验失败）
-常见原因：
-- `/simulate` 和 `/evaluate` 同时传了 `template_id` 与 `inline_template`，或两者都没传。
-- 输入 JSON 缺字段/类型不匹配。
-调整方式：
-- 保证模板来源二选一。
-- 按 `contracts.py` 对应结构补齐字段。
-
-### 6.3 返回 `404 template not found`
-原因：模板未发布，或服务重启后内存仓储清空。
-调整方式：
-- 先执行 `generate -> validate -> publish`。
-- 如果需要持久化，替换 `InMemoryTemplateRepository` 为数据库实现。
-
-### 6.4 迁移草案置信度低（`generation_strategy=rule_only_low_confidence`）
-调整方式：
-- 增加字段语义信息（`semantic_label`、单位、可控性）。
-- 补充更明确的 `nl_requirements`。
-- 注入 `llm_suggester` 进行混合建议。
-
-### 6.5 仿真结果 `executed=false`
-原因：守护规则触发 `reject`。
-调整方式：
-- 调整 `GuardrailRule` 的 `max_delta/min/max`。
-- 先定位 `violations` 字段，再校准约束与目标权重。
-
-## 7. CLI 使用
-输出合成模板：
-```bash
-easyshift-maas sample-template --variant energy
-```
-
-生成迁移草案：
-```bash
-easyshift-maas generate-draft \
-  --metadata ./src/easyshift_maas/examples/data/scene_metadata.json \
-  --fields ./src/easyshift_maas/examples/data/field_dictionary.json \
-  --requirement "prioritize stability"
-```
-
-校验草案：
-```bash
-easyshift-maas validate-draft --draft ./draft.json
-```
-
-运行仿真：
-```bash
-easyshift-maas simulate \
-  --template ./template.json \
-  --context ./src/easyshift_maas/examples/data/context.json
-```
-
-## 8. 开发与质量门禁
-- 单元测试：`tests/unit`
-- 契约测试：`tests/contract`
-- 端到端测试：`tests/e2e`
-- 敏感扫描：`python tools/sensitive_scan.py`
-
-## 9. 非泄漏与合规
-- 仅保留 synthetic 示例。
-- CI 自动执行敏感模式扫描：`.github/workflows/non-leakage.yml`。
-- 禁止提交任何商用 demo 资产。
-
-## 10. 迁移说明
-这是破坏性切换版本：
-- 包名：`agentic_maas` -> `easyshift_maas`
-- API 主线：旧路由切换为模板迁移与仿真评测路由
-- 契约中心：`ScenarioTemplate` / `MigrationDraft` / `MigrationValidationReport`
-
-详细见：`docs/MIGRATION_GUIDE.md`。
-
-## 11. License
+## License
 Apache-2.0

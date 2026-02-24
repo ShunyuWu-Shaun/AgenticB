@@ -1,0 +1,10 @@
+redis_config:
+  host: 127.0.0.1
+  port: 6379
+
+AB10PT101: AB10PT101
+AB10FT201: AB10FT201
+AB10TT301: AB10TT301
+
+threshold: 0.8
+duration: 30

@@ -49,6 +49,22 @@ class IssueSeverity(str, Enum):
     INFO = "info"
 
 
+class DataSourceKind(str, Enum):
+    REDIS = "redis"
+    MYSQL = "mysql"
+
+
+class CatalogLoadMode(str, Enum):
+    STANDARD = "standard"
+    LEGACY = "legacy"
+
+
+class SnapshotMissingPolicy(str, Enum):
+    ERROR = "error"
+    DROP = "drop"
+    ZERO = "zero"
+
+
 class SceneMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +73,78 @@ class SceneMetadata(BaseModel):
     tags: list[str] = Field(default_factory=list)
     granularity_sec: int = Field(default=60, gt=0)
     execution_window_sec: int = Field(default=300, gt=0)
+
+
+class DataSourceOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    batch_size: int = Field(default=500, ge=1, le=5000)
+    timeout_ms: int = Field(default=500, ge=1)
+    tls: bool = False
+    retries: int = Field(default=1, ge=0, le=10)
+    mysql_table: str = "point_snapshot"
+    mysql_point_column: str = "point_id"
+    mysql_value_column: str = "value"
+    mysql_ts_column: Optional[str] = None
+
+
+class DataSourceProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    kind: DataSourceKind
+    conn_ref: str
+    options: DataSourceOptions = Field(default_factory=DataSourceOptions)
+
+
+class PointBinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    point_id: str
+    source_type: DataSourceKind
+    source_ref: str
+    field_name: str
+    unit: str = "dimensionless"
+    transform: Optional[str] = None
+    enabled: bool = True
+    tags: list[str] = Field(default_factory=list)
+
+
+class PointCatalog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    catalog_id: str
+    version: str = "v1"
+    bindings: list[PointBinding] = Field(default_factory=list)
+    refresh_sec: int = Field(default=30, ge=1)
+    source_profile: str = "default"
+    created_at: datetime = Field(default_factory=now_utc)
+
+    @model_validator(mode="after")
+    def _ensure_unique_points(self) -> "PointCatalog":
+        ids = [item.point_id for item in self.bindings]
+        if len(ids) != len(set(ids)):
+            raise ValueError("point_id must be unique in point catalog")
+        return self
+
+
+class SnapshotRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    catalog_id: str
+    fields: Optional[list[str]] = None
+    at: Optional[datetime] = None
+    missing_policy: SnapshotMissingPolicy = SnapshotMissingPolicy.ERROR
+
+
+class SnapshotResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    values: dict[str, float] = Field(default_factory=dict)
+    quality_flags: dict[str, str] = Field(default_factory=dict)
+    missing_fields: list[str] = Field(default_factory=list)
+    source_latency_ms: dict[str, int] = Field(default_factory=dict)
+    collected_at: datetime = Field(default_factory=now_utc)
 
 
 class FieldDefinition(BaseModel):
@@ -235,12 +323,51 @@ class MigrationValidationReport(BaseModel):
     issues: list[MigrationValidationIssue] = Field(default_factory=list)
 
 
+class TemplateQualityGate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    structural_min: float = Field(default=0.98, ge=0.0, le=1.0)
+    semantic_min: float = Field(default=0.98, ge=0.0, le=1.0)
+    solvability_min: float = Field(default=0.95, ge=0.0, le=1.0)
+    guardrail_min: float = Field(default=0.95, ge=0.0, le=1.0)
+    regression_min: float = Field(default=0.90, ge=0.0, le=1.0)
+    overall_min: float = Field(default=0.95, ge=0.0, le=1.0)
+
+
+class TemplateQualityIssue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    message: str
+    severity: IssueSeverity
+
+
+class TemplateQualityReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    overall_score: float = Field(ge=0.0, le=1.0)
+    structural_score: float = Field(ge=0.0, le=1.0)
+    semantic_score: float = Field(ge=0.0, le=1.0)
+    solvability_score: float = Field(ge=0.0, le=1.0)
+    guardrail_coverage: float = Field(ge=0.0, le=1.0)
+    regression_score: float = Field(ge=0.0, le=1.0)
+    passed: bool
+    issues: list[TemplateQualityIssue] = Field(default_factory=list)
+
+
 class SceneContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     values: dict[str, float] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     timestamp: datetime = Field(default_factory=now_utc)
+
+
+class ContextBuildResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scene_context: SceneContext
+    snapshot: SnapshotResult
 
 
 class PredictionResult(BaseModel):

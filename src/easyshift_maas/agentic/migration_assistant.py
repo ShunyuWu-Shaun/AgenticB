@@ -201,6 +201,7 @@ class HybridMigrationAssistant:
         objective_terms: list[ObjectiveTerm],
     ) -> GuardrailSpec:
         rules: list[GuardrailRule] = []
+        covered: set[str] = set()
         for term in objective_terms:
             field = next((item for item in field_dictionary.fields if item.field_name == term.field_name), None)
             if field is None:
@@ -224,6 +225,20 @@ class HybridMigrationAssistant:
                         action=GuardrailAction.CLIP,
                     )
                 )
+
+            covered.add(term.field_name)
+
+        # Ensure all controllable fields are guarded in baseline drafts.
+        for field in field_dictionary.fields:
+            if not field.controllable or field.field_name in covered:
+                continue
+            rules.append(
+                GuardrailRule(
+                    field_name=field.field_name,
+                    max_delta=0.2,
+                    action=GuardrailAction.CLIP,
+                )
+            )
 
         return GuardrailSpec(rules=rules)
 

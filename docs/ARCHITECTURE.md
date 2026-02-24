@@ -1,20 +1,49 @@
-# EasyShift-MaaS Architecture
+# EasyShift-MaaS Architecture (v0.2)
 
-## Four-Layer Runtime
-1. Core Layer: contracts, predictor, optimizer, guardrail, pipeline.
-2. Template Layer: schema + versioned template repository.
-3. Agentic Layer: migration assistant, validator, regression planner.
-4. Service Layer: FastAPI endpoints for generation, validation, publish, simulation, evaluation.
+## Runtime Layers
+1. Core Layer
+   - `contracts.py`
+   - `predictor.py`
+   - `optimizer.py`
+   - `guardrail.py`
+   - `pipeline.py`
+2. Ingestion Layer
+   - YAML loader (`standard|legacy`)
+   - Catalog repository
+   - Redis/MySQL snapshot providers
+   - context builder (`PointCatalog -> SceneContext`)
+3. Agentic + Quality Layer
+   - migration assistant
+   - template validator
+   - template quality evaluator
+   - regression planner
+4. Service Layer
+   - FastAPI endpoints
+   - template/catalog repos
+   - health and observability
 
-## Migration-Centric Agentic Design
-- Agentic module does not directly execute closed-loop control.
-- Agentic module focuses on portability tasks:
-  - semantic field mapping hints
-  - constraint/objective draft generation
-  - migration risk and pending confirmations
-  - regression case planning
+## Key Contracts
+- `PointBinding`, `PointCatalog`, `DataSourceProfile`
+- `SnapshotRequest`, `SnapshotResult`
+- `ScenarioTemplate`, `MigrationDraft`, `MigrationValidationReport`
+- `TemplateQualityGate`, `TemplateQualityReport`
 
-## Safety And Correctness
-- Drafts are validated before publish.
-- Validation outputs correctness score, conflict rate, guardrail coverage.
-- Publish can be blocked when validation fails.
+## Why Template-Centric
+- Template is a versioned migration contract.
+- Agentic output becomes auditable and replayable.
+- Objective/constraint/guardrail logic is no longer scattered in scripts.
+
+## Correctness & Gate
+Quality gate dimensions:
+1. structural
+2. semantic
+3. solvability
+4. guardrail coverage
+5. regression score
+
+Default publish policy: validation pass + quality pass.
+
+## Deployment Model
+- Local/dev: Docker Compose (`easyshift-api + redis + mysql + secrets`)
+- Production baseline: Helm chart + secretKeyRef
+- Binary distribution: Nuitka (`scripts/build_nuitka.sh`)
