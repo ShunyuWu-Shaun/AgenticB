@@ -4,4 +4,4 @@
 - `docs/reference/http-api.md`
 
 在线阅读：
-- <https://shunyuwu-shaun.github.io/AgenticB/reference/http-api/>
+- <https://shunyuwu-shaun.github.io/EasyShift-MaaS/reference/http-api/>

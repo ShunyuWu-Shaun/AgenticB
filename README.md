@@ -10,7 +10,7 @@
 </p>
 
 ## 1. 这个库到底解决什么问题
-在工业/B 端场景里，真正困难通常不是“写一个优化器”，而是：
+在工业/B 端场景里，常见难点集中在以下方面：
 - 现场点位很多（几百到几千），命名混乱，语义不统一。
 - 预测/优化/约束/安全边界散落在脚本里，迁移成本高。
 - 新场景上线前缺少统一、可解释、可审计的发布标准。
@@ -49,7 +49,7 @@ EasyShift-MaaS 的定位就是解决这三件事：
    - 预测结果、优化建议值、**安全规则判定结果**、最终建议值
 
 ## 4. 迁移草案应该长什么样（重点）
-`MigrationDraft` 不是一句提示词结果，而是完整结构化对象：
+`MigrationDraft` 是完整的结构化对象，不是文本建议。
 
 ```json
 {
@@ -110,7 +110,7 @@ EasyShift-MaaS 的定位就是解决这三件事：
 }
 ```
 
-### 4.1 一份“可发布草案”至少要满足
+### 4.1 一份可发布草案至少要满足
 - `objective` 非空。
 - `prediction.feature_fields` 全部在 `field_dictionary` 中。
 - `constraints` 无冲突。
@@ -171,7 +171,7 @@ pip install '.[build]'
   - `GET /health`
 
 ## 9. 文档站
-- 在线文档（GitHub Pages）：<https://shunyuwu-shaun.github.io/AgenticB/>
+- 在线文档（GitHub Pages）：<https://shunyuwu-shaun.github.io/EasyShift-MaaS/>
 - 本地预览：
 ```bash
 pip install '.[docs]'
@@ -179,7 +179,7 @@ mkdocs serve
 ```
 
 ## 10. 术语替换（避免抽象）
-- `守护裁决` -> **安全规则判定结果**
+- **安全规则判定结果**：指优化建议在安全规则检查后的状态和调整结果
 - `守护规则` -> **安全规则**
 - `发布门禁` -> **质量门禁（可配置阈值）**
 

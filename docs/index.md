@@ -4,8 +4,8 @@ EasyShift-MaaS 是一个面向工业/B 端场景的 **迁移型 Agentic + 预测
 
 它主要解决三件事：
 1. 把现场零散点位配置（通常是 YAML + Redis/MySQL 键）整理成统一的数据契约。
-2. 把“旧场景的预测-优化逻辑”迁移成可复用模板，而不是散落脚本。
-3. 在发布前做可解释的质量校验，避免“能跑但不可靠”的模板上线。
+2. 把旧场景的预测-优化逻辑迁移成可复用模板，而不是散落脚本。
+3. 在发布前做可解释的质量校验，避免能跑但不可靠的模板上线。
 
 ## 你可以得到什么
 - 统一点位模型：`PointCatalog` + `FieldDictionary`
@@ -25,6 +25,6 @@ EasyShift-MaaS 是一个面向工业/B 端场景的 **迁移型 Agentic + 预测
 5. [标准YAML工业流程教程](tutorials/industrial-standard-yaml.md)
 
 ## 在线文档发布
-- GitHub Pages（默认）：`https://shunyuwu-shaun.github.io/AgenticB/`
+- GitHub Pages（默认）：`https://shunyuwu-shaun.github.io/EasyShift-MaaS/`
 
 > 若页面暂未出现，请确认仓库 Settings -> Pages 已启用 `GitHub Actions` 作为 Source。

@@ -6,4 +6,4 @@
 - `docs/tutorials/legacy-yaml-migration.md`
 
 在线阅读：
-- <https://shunyuwu-shaun.github.io/AgenticB/>
+- <https://shunyuwu-shaun.github.io/EasyShift-MaaS/>

@@ -1,7 +1,7 @@
 # 迁移草案定义
 
 ## 定义
-`MigrationDraft` 是“迁移建议”的标准结构。
+`MigrationDraft` 是迁移建议的标准结构。
 
 它包含两部分：
 - **模板本体**：`ScenarioTemplate`
