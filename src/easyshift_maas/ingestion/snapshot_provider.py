@@ -54,6 +54,9 @@ class CompositeSnapshotProvider:
             for item in catalog.bindings
             if item.enabled and (not selected_fields or item.field_name in selected_fields)
         ]
+        requested_but_unbound = sorted(
+            selected_fields.difference({item.field_name for item in selected_bindings})
+        )
 
         grouped: dict[DataSourceKind, list[PointBinding]] = defaultdict(list)
         for binding in selected_bindings:
@@ -61,7 +64,9 @@ class CompositeSnapshotProvider:
 
         merged_values: dict[str, float] = {}
         merged_flags: dict[str, str] = {}
-        merged_missing: list[str] = []
+        merged_missing: list[str] = list(requested_but_unbound)
+        for field in requested_but_unbound:
+            merged_flags[field] = "binding_missing"
         merged_latency: dict[str, int] = {}
 
         for kind, bindings in grouped.items():
