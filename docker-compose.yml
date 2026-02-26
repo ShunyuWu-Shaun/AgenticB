@@ -1,11 +1,11 @@
 version: "3.9"
 
 services:
-  easyshift-api:
+  reflexflow-api:
     build:
       context: .
       target: runtime
-    container_name: easyshift-api
+    container_name: reflexflow-api
     depends_on:
       - redis
       - mysql
@@ -13,8 +13,8 @@ services:
       - sh
       - -c
       - |
-        export EASYSHIFT_REDIS_CONN="$(cat /run/secrets/redis_conn)" && \
-        export EASYSHIFT_MYSQL_CONN="$(cat /run/secrets/mysql_conn)" && \
+        export REFLEXFLOW_REDIS_CONN="$(cat /run/secrets/redis_conn)" && \
+        export REFLEXFLOW_MYSQL_CONN="$(cat /run/secrets/mysql_conn)" && \
         uvicorn easyshift_maas.api.app:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
@@ -24,17 +24,17 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: easyshift-redis
+    container_name: reflexflow-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
 
   mysql:
     image: mysql:8.4
-    container_name: easyshift-mysql
+    container_name: reflexflow-mysql
     environment:
-      MYSQL_DATABASE: easyshift
-      MYSQL_USER: easyshift
+      MYSQL_DATABASE: reflexflow
+      MYSQL_USER: reflexflow
       MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
     ports:

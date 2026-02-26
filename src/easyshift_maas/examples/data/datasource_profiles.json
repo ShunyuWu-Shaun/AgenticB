@@ -2,7 +2,7 @@
   {
     "name": "redis_main",
     "kind": "redis",
-    "conn_ref": "env:EASYSHIFT_REDIS_CONN",
+    "conn_ref": "env:REFLEXFLOW_REDIS_CONN",
     "options": {
       "batch_size": 200,
       "timeout_ms": 500,
@@ -17,7 +17,7 @@
   {
     "name": "mysql_main",
     "kind": "mysql",
-    "conn_ref": "env:EASYSHIFT_MYSQL_CONN",
+    "conn_ref": "env:REFLEXFLOW_MYSQL_CONN",
     "options": {
       "batch_size": 500,
       "timeout_ms": 1000,

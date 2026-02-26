@@ -66,6 +66,15 @@ class YamlCatalogLoader:
         "real_time_inputs",
         "reference_values_send",
     }
+    _LEGACY_SECTION_HINTS = {
+        "inputs",
+        "real_time_inputs",
+        "realtime_inputs",
+        "raw_keys",
+        "realtime_raw_keys",
+        "reference_values_send",
+        "output_var",
+    }
 
     def load(
         self,
@@ -139,6 +148,7 @@ class YamlCatalogLoader:
 
         if not bindings:
             raise ValueError("point_catalog.bindings cannot be empty in standard mode")
+        bindings = self._deduplicate_binding_ids(bindings, warnings)
 
         catalog = PointCatalog(
             catalog_id=str(catalog_data.get("catalog_id") or f"{scene.scene_id}-catalog"),
@@ -221,10 +231,13 @@ class YamlCatalogLoader:
         if not bindings:
             bindings = self._extract_from_nested_inputs(payload)
             if bindings:
-                warnings.append("legacy fallback parser used nested inputs/real_time_inputs sections")
+                warnings.append(
+                    "legacy fallback parser used nested sections and auto-mapped point tags"
+                )
 
         if not bindings:
             raise ValueError("no point-like entries found in legacy yaml")
+        bindings = self._deduplicate_binding_ids(bindings, warnings)
 
         catalog = PointCatalog(
             catalog_id=f"{scene.scene_id}-catalog",
@@ -283,27 +296,27 @@ class YamlCatalogLoader:
                 DataSourceProfile(
                     name="legacy-redis",
                     kind=DataSourceKind.REDIS,
-                    conn_ref="env:EASYSHIFT_REDIS_CONN",
+                    conn_ref="env:REFLEXFLOW_REDIS_CONN",
                 )
             )
-            warnings.append("legacy redis_config detected; using conn_ref=env:EASYSHIFT_REDIS_CONN")
+            warnings.append("legacy redis_config detected; using conn_ref=env:REFLEXFLOW_REDIS_CONN")
 
         if isinstance(payload.get("mysql_config"), dict):
             profiles.append(
                 DataSourceProfile(
                     name="legacy-mysql",
                     kind=DataSourceKind.MYSQL,
-                    conn_ref="env:EASYSHIFT_MYSQL_CONN",
+                    conn_ref="env:REFLEXFLOW_MYSQL_CONN",
                 )
             )
-            warnings.append("legacy mysql_config detected; using conn_ref=env:EASYSHIFT_MYSQL_CONN")
+            warnings.append("legacy mysql_config detected; using conn_ref=env:REFLEXFLOW_MYSQL_CONN")
 
         if not profiles:
             profiles.append(
                 DataSourceProfile(
                     name="legacy-redis",
                     kind=DataSourceKind.REDIS,
-                    conn_ref="env:EASYSHIFT_REDIS_CONN",
+                    conn_ref="env:REFLEXFLOW_REDIS_CONN",
                 )
             )
             warnings.append("no datasource block found; defaulted to redis env connection")
@@ -331,34 +344,36 @@ class YamlCatalogLoader:
 
     def _extract_from_nested_inputs(self, payload: dict[str, Any]) -> list[PointBinding]:
         bindings: list[PointBinding] = []
-        for section_name in ("inputs", "real_time_inputs"):
-            section = payload.get(section_name)
+        for section_name, section in payload.items():
             if not isinstance(section, dict):
                 continue
+            if section_name not in self._LEGACY_SECTION_HINTS and not self._section_looks_like_points(section):
+                continue
+
             for key, value in section.items():
-                if isinstance(value, str):
-                    point_id = str(value)
+                if isinstance(value, str) and self._value_looks_like_point_tag(value):
+                    point_id = f"{section_name}:{key}"
                     field_name = self._sanitize_field_name(key)
                     bindings.append(
                         PointBinding(
                             point_id=point_id,
                             source_type=DataSourceKind.REDIS,
-                            source_ref=point_id,
+                            source_ref=value,
                             field_name=field_name,
                             unit="dimensionless",
                         )
                     )
                 elif isinstance(value, list):
                     for idx, item in enumerate(value):
-                        if not isinstance(item, str):
+                        if not isinstance(item, str) or not self._value_looks_like_point_tag(item):
                             continue
-                        point_id = str(item)
+                        point_id = f"{section_name}:{key}:{idx}"
                         field_name = self._sanitize_field_name(f"{key}_{idx}")
                         bindings.append(
                             PointBinding(
                                 point_id=point_id,
                                 source_type=DataSourceKind.REDIS,
-                                source_ref=point_id,
+                                source_ref=item,
                                 field_name=field_name,
                                 unit="dimensionless",
                             )
@@ -374,5 +389,44 @@ class YamlCatalogLoader:
             if any(name in value for name in ("source_ref", "field_name", "tag", "key")):
                 return True
         if isinstance(value, str) and value:
+            if self._value_looks_like_point_tag(value):
+                return True
             return bool(re.search(r"[A-Z]{2,}[0-9]", key)) or key.isupper()
         return False
+
+    def _section_looks_like_points(self, section: dict[str, Any]) -> bool:
+        if not section:
+            return False
+        total = len(section)
+        tag_like = 0
+        for value in section.values():
+            if isinstance(value, str) and self._value_looks_like_point_tag(value):
+                tag_like += 1
+            elif isinstance(value, list):
+                if any(isinstance(item, str) and self._value_looks_like_point_tag(item) for item in value):
+                    tag_like += 1
+        return tag_like >= max(3, int(total * 0.3))
+
+    def _value_looks_like_point_tag(self, value: str) -> bool:
+        text = value.strip()
+        if not text:
+            return False
+        # Industrial tags are usually uppercase/digit/underscore mixed codes.
+        return bool(re.fullmatch(r"[A-Za-z0-9_:-]{4,}", text)) and bool(re.search(r"[A-Z]", text))
+
+    def _deduplicate_binding_ids(self, bindings: list[PointBinding], warnings: list[str]) -> list[PointBinding]:
+        deduped: list[PointBinding] = []
+        used: dict[str, int] = {}
+        for binding in bindings:
+            count = used.get(binding.point_id, 0)
+            used[binding.point_id] = count + 1
+            if count == 0:
+                deduped.append(binding)
+                continue
+
+            new_id = f"{binding.point_id}__{count + 1}"
+            warnings.append(f"duplicate point_id '{binding.point_id}' renamed to '{new_id}'")
+            deduped.append(
+                binding.model_copy(update={"point_id": new_id})
+            )
+        return deduped

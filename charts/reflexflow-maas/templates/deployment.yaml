@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["uvicorn"]
+          args: ["easyshift_maas.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+          {{- if or .Values.secrets.redisConnSecretName .Values.secrets.mysqlConnSecretName }}
+          env:
+            {{- if .Values.secrets.redisConnSecretName }}
+            - name: {{ .Values.secrets.redisConnEnv }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.redisConnSecretName }}
+                  key: {{ .Values.secrets.redisConnSecretKey }}
+            {{- end }}
+            {{- if .Values.secrets.mysqlConnSecretName }}
+            - name: {{ .Values.secrets.mysqlConnEnv }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.mysqlConnSecretName }}
+                  key: {{ .Values.secrets.mysqlConnSecretKey }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

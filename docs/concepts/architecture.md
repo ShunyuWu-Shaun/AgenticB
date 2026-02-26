@@ -1,7 +1,7 @@
 # 架构与运行逻辑
 
 ## 总体结构
-EasyShift-MaaS v0.3 由四层组成：
+ReflexFlow-MaaS v0.3 由四层组成：
 
 1. 数据接入层
 - 负责 YAML 点位导入、Redis/MySQL 快照读取、上下文构建。

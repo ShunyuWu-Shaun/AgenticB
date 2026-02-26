@@ -18,12 +18,12 @@ uvicorn easyshift_maas.api.app:app --reload --port 8000
 
 ## LLM 环境变量
 ```bash
-export EASYSHIFT_LLM_VENDOR=qwen
-export EASYSHIFT_LLM_API_KEY=your_api_key
-export EASYSHIFT_LLM_MODEL_PARSER=qwen-plus
-export EASYSHIFT_LLM_MODEL_GENERATOR=qwen-plus
-export EASYSHIFT_LLM_MODEL_CRITIC=qwen-plus
-export EASYSHIFT_LLM_TIMEOUT_SEC=30
+export REFLEXFLOW_LLM_VENDOR=qwen
+export REFLEXFLOW_LLM_API_KEY=your_api_key
+export REFLEXFLOW_LLM_MODEL_PARSER=qwen-plus
+export REFLEXFLOW_LLM_MODEL_GENERATOR=qwen-plus
+export REFLEXFLOW_LLM_MODEL_CRITIC=qwen-plus
+export REFLEXFLOW_LLM_TIMEOUT_SEC=30
 ```
 
 支持供应商：`kimi`、`qwen`、`deepseek`、`openai`。
@@ -40,12 +40,12 @@ pip install '.[build]'
 ```
 
 输出：
-- `dist/easyshift-maas`（CLI）
-- `dist/easyshift-maas-api`（API）
+- `dist/reflexflow-maas`（CLI）
+- `dist/reflexflow-maas-api`（API）
 
 ## 测试与扫描
 ```bash
 .venv/bin/pytest -q
-python tools/sensitive_scan.py
+.venv/bin/python tools/sensitive_scan.py
 mkdocs build --strict
 ```

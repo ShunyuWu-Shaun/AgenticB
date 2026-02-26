@@ -68,7 +68,7 @@ class RoleBasedLLMClient:
 
         if not config.base_url:
             raise RuntimeError(
-                "missing EASYSHIFT_LLM_BASE_URL (or EASYSHIFT_LLM_VENDOR preset) for LLM provider"
+                "missing REFLEXFLOW_LLM_BASE_URL (or REFLEXFLOW_LLM_VENDOR preset) for LLM provider"
             )
 
         api_key = os.getenv(config.api_key_env)

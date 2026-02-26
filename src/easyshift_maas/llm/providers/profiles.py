@@ -38,14 +38,14 @@ VENDOR_PRESETS: dict[str, VendorPreset] = {
 
 
 def _pick_vendor() -> str:
-    raw = os.getenv("EASYSHIFT_LLM_VENDOR", "custom").strip().lower()
+    raw = os.getenv("REFLEXFLOW_LLM_VENDOR", os.getenv("EASYSHIFT_LLM_VENDOR", "custom")).strip().lower()
     if raw in VENDOR_PRESETS:
         return raw
     return "custom"
 
 
 def _resolve_base_url(vendor: str) -> str | None:
-    explicit = os.getenv("EASYSHIFT_LLM_BASE_URL")
+    explicit = os.getenv("REFLEXFLOW_LLM_BASE_URL", os.getenv("EASYSHIFT_LLM_BASE_URL"))
     if explicit:
         return explicit.strip()
     preset = VENDOR_PRESETS.get(vendor)
@@ -59,23 +59,46 @@ def _resolve_default_model(vendor: str) -> str:
     return "gpt-4o-mini"
 
 
+def _default_api_key_env() -> str:
+    if os.getenv("REFLEXFLOW_LLM_API_KEY"):
+        return "REFLEXFLOW_LLM_API_KEY"
+    if os.getenv("EASYSHIFT_LLM_API_KEY"):
+        return "EASYSHIFT_LLM_API_KEY"
+    return "REFLEXFLOW_LLM_API_KEY"
+
+
 def build_role_configs_from_env() -> dict[str, LLMProviderConfig]:
     """Build parser/generator/critic role configs from env vars.
 
     Required runtime vars for actual LLM call:
-    - EASYSHIFT_LLM_BASE_URL (or known vendor preset)
-    - EASYSHIFT_LLM_API_KEY (or custom env via EASYSHIFT_LLM_API_KEY_ENV)
+    - REFLEXFLOW_LLM_BASE_URL (or known vendor preset)
+    - REFLEXFLOW_LLM_API_KEY (or custom env via REFLEXFLOW_LLM_API_KEY_ENV)
+
+    Backward compatibility:
+    - EASYSHIFT_LLM_* is still accepted.
     """
 
     vendor = _pick_vendor()
     base_url = _resolve_base_url(vendor)
-    api_key_env = os.getenv("EASYSHIFT_LLM_API_KEY_ENV", "EASYSHIFT_LLM_API_KEY")
-    timeout_s = int(os.getenv("EASYSHIFT_LLM_TIMEOUT_SEC", "30"))
+    api_key_env = os.getenv(
+        "REFLEXFLOW_LLM_API_KEY_ENV",
+        os.getenv("EASYSHIFT_LLM_API_KEY_ENV", _default_api_key_env()),
+    )
+    timeout_s = int(os.getenv("REFLEXFLOW_LLM_TIMEOUT_SEC", os.getenv("EASYSHIFT_LLM_TIMEOUT_SEC", "30")))
 
     default_model = _resolve_default_model(vendor)
-    parser_model = os.getenv("EASYSHIFT_LLM_MODEL_PARSER", default_model)
-    generator_model = os.getenv("EASYSHIFT_LLM_MODEL_GENERATOR", default_model)
-    critic_model = os.getenv("EASYSHIFT_LLM_MODEL_CRITIC", default_model)
+    parser_model = os.getenv(
+        "REFLEXFLOW_LLM_MODEL_PARSER",
+        os.getenv("EASYSHIFT_LLM_MODEL_PARSER", default_model),
+    )
+    generator_model = os.getenv(
+        "REFLEXFLOW_LLM_MODEL_GENERATOR",
+        os.getenv("EASYSHIFT_LLM_MODEL_GENERATOR", default_model),
+    )
+    critic_model = os.getenv(
+        "REFLEXFLOW_LLM_MODEL_CRITIC",
+        os.getenv("EASYSHIFT_LLM_MODEL_CRITIC", default_model),
+    )
 
     return {
         "parser": LLMProviderConfig(

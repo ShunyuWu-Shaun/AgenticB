@@ -9,7 +9,7 @@ docker compose up --build
 ```
 
 ## 组件
-- `easyshift-api`
+- `reflexflow-api`
 - `redis`
 - `mysql`
 

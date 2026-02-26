@@ -11,8 +11,8 @@ pip install '.[build]'
 ```
 
 ## 输出
-- `dist/easyshift-maas`
-- `dist/easyshift-maas-api`
+- `dist/reflexflow-maas`
+- `dist/reflexflow-maas-api`
 
 ## 注意
 - 构建时间与平台相关。

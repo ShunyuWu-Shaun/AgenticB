@@ -16,7 +16,7 @@ scene:
 datasources:
   redis_main:
     kind: redis
-    conn_ref: env:EASYSHIFT_REDIS_CONN
+    conn_ref: env:REFLEXFLOW_REDIS_CONN
     options:
       batch_size: 500
       timeout_ms: 500

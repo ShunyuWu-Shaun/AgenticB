@@ -10,7 +10,7 @@ scene:
 datasources:
   redis_main:
     kind: redis
-    conn_ref: env:EASYSHIFT_REDIS_CONN
+    conn_ref: env:REFLEXFLOW_REDIS_CONN
     options:
       batch_size: 200
       timeout_ms: 300
@@ -56,3 +56,21 @@ threshold: 0.8
     assert len(result.catalog.bindings) == 2
     assert result.source_profiles[0].kind.value == "redis"
     assert result.pending_confirmations
+
+
+def test_legacy_nested_sections_with_duplicate_tags() -> None:
+    yaml_text = """
+inputs:
+  specific_heat_of_slag: AMICS_BALAR1500
+  coal_net_calorific_value: AMICS_BALAR1503
+real_time_inputs:
+  air_preheater_outlet_oxygen_content_A1: RAA10BQ101
+  air_preheater_outlet_oxygen_content_A2: RAA10BQ101
+  airheater_outlet_temp_A1: RAA10BT301
+"""
+    result = YamlCatalogLoader().load(yaml_text=yaml_text, mode=CatalogLoadMode.LEGACY)
+
+    assert len(result.catalog.bindings) >= 5
+    assert len({item.point_id for item in result.catalog.bindings}) == len(result.catalog.bindings)
+    assert len([item for item in result.catalog.bindings if item.source_ref == "RAA10BQ101"]) == 2
+    assert result.field_dictionary.has_field("air_preheater_outlet_oxygen_content_a1")

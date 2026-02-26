@@ -3,12 +3,12 @@ requires = ["hatchling>=1.24.2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "easyshift-maas"
+name = "reflexflow-maas"
 version = "0.3.0"
 description = "LLM-driven multi-agent migration framework for reusable prediction-optimization MaaS patterns"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "EasyShift Contributors" }]
+authors = [{ name = "ReflexFlow Contributors" }]
 license = { text = "Apache-2.0" }
 dependencies = [
   "fastapi>=0.115.0,<1.0.0",
@@ -36,6 +36,8 @@ docs = [
 ]
 
 [project.scripts]
+reflexflow-maas-api = "easyshift_maas.api.app:run"
+reflexflow-maas = "easyshift_maas.cli:main"
 easyshift-maas-api = "easyshift_maas.api.app:run"
 easyshift-maas = "easyshift_maas.cli:main"
 

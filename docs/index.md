@@ -1,15 +1,15 @@
-# EasyShift-MaaS 文档
+# ReflexFlow-MaaS 文档
 
-![EasyShift-MaaS Logo](assets/branding/logo.png)
+![ReflexFlow-MaaS Logo](assets/branding/logo.png)
 
-EasyShift-MaaS 是用于工业预测-优化配置迁移的多 Agent 框架。
+ReflexFlow-MaaS 是用于工业预测-优化配置迁移的多 Agent 框架。
 
 它的分工明确：
 1. LLM 负责语义理解与结构化草案生成。
 2. 确定性代码负责校验、评分和阻断。
 3. 自动修正流程在失败后给出下一轮修改建议。
 
-![EasyShift-MaaS Framework](assets/branding/framework.png)
+![ReflexFlow-MaaS Framework](assets/branding/framework.png)
 
 ## 核心价值
 1. 把 legacy 点位名称转换成标准字段字典。
@@ -24,4 +24,4 @@ EasyShift-MaaS 是用于工业预测-优化配置迁移的多 Agent 框架。
 5. [HTTP API](reference/http-api.md)
 
 ## 文档站发布地址
-- [https://shunyuwu-shaun.github.io/EasyShift-MaaS/](https://shunyuwu-shaun.github.io/EasyShift-MaaS/)
+- [https://shunyuwu-shaun.github.io/ReflexFlow-MaaS/](https://shunyuwu-shaun.github.io/ReflexFlow-MaaS/)

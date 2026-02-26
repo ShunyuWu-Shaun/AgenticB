@@ -1,4 +1,4 @@
-"""EasyShift-MaaS: LLM-driven multi-agent migration pipeline for reusable prediction-optimization."""
+"""ReflexFlow-MaaS: LLM-driven multi-agent migration pipeline for reusable prediction-optimization."""
 
 from easyshift_maas.core.contracts import (
     AgenticRunReport,

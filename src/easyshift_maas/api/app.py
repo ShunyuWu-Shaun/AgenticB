@@ -201,7 +201,7 @@ class QualityCheckRequest(BaseModel):
         return self
 
 
-app = FastAPI(title="EasyShift-MaaS", version="0.3.0")
+app = FastAPI(title="ReflexFlow-MaaS", version="0.3.0")
 instrument_fastapi(app)
 
 llm_router = RoleBasedLLMClient()

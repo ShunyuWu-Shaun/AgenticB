@@ -183,7 +183,7 @@ def cmd_simulate(template_path: str, context_path: str) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="EasyShift-MaaS CLI")
+    parser = argparse.ArgumentParser(description="ReflexFlow-MaaS CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
     parse = sub.add_parser("parse-points", help="Map legacy points to canonical fields")

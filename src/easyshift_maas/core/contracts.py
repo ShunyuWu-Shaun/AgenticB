@@ -337,7 +337,7 @@ class LLMProviderConfig(BaseModel):
     provider_name: str = "openai_compatible"
     vendor: str = "custom"
     base_url: Optional[str] = None
-    api_key_env: str = "EASYSHIFT_LLM_API_KEY"
+    api_key_env: str = "REFLEXFLOW_LLM_API_KEY"
     model: str
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     timeout_s: int = Field(default=30, ge=1, le=300)

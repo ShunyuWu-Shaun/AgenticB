@@ -13,7 +13,7 @@ scene:
 datasources:
   redis_main:
     kind: redis
-    conn_ref: env:EASYSHIFT_REDIS_CONN
+    conn_ref: env:REFLEXFLOW_REDIS_CONN
 point_catalog:
   catalog_id: api-line-catalog
   source_profile: redis_main

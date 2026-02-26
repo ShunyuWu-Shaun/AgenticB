@@ -4,4 +4,4 @@
 - `docs/concepts/architecture.md`
 
 在线阅读：
-- <https://shunyuwu-shaun.github.io/EasyShift-MaaS/concepts/architecture/>
+- <https://shunyuwu-shaun.github.io/ReflexFlow-MaaS/concepts/architecture/>

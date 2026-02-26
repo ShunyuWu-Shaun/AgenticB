@@ -1,6 +1,6 @@
 # 部署：Helm
 
-Chart 路径：`charts/easyshift-maas/`
+Chart 路径：`charts/reflexflow-maas/`
 
 ## 关键 values
 - `image.repository`
@@ -11,12 +11,12 @@ Chart 路径：`charts/easyshift-maas/`
 
 ## 典型命令
 ```bash
-helm upgrade --install easyshift charts/easyshift-maas \
-  --set image.repository=<your-repo>/easyshift-maas \
-  --set image.tag=0.2.0 \
-  --set secrets.redisConnSecretName=easyshift-secrets \
+helm upgrade --install reflexflow charts/reflexflow-maas \
+  --set image.repository=<your-repo>/reflexflow-maas \
+  --set image.tag=0.3.0 \
+  --set secrets.redisConnSecretName=reflexflow-secrets \
   --set secrets.redisConnSecretKey=redis_conn \
-  --set secrets.mysqlConnSecretName=easyshift-secrets \
+  --set secrets.mysqlConnSecretName=reflexflow-secrets \
   --set secrets.mysqlConnSecretKey=mysql_conn
 ```
 
