@@ -2,71 +2,92 @@
 
 Base URL: `http://127.0.0.1:8000`
 
-## Catalog 与 Context
-### `POST /v1/catalogs/import`
-- 作用：导入点位 YAML。
-- 入参：
-  - `mode`: `standard|legacy`
-  - `yaml_text` 或 `yaml_path`（二选一）
-  - `source_profiles`（可选）
-- 出参：`catalog_id`, `binding_count`, `warnings`, `pending_confirmations`
+## Agentic API
+### `POST /v1/agentic/parse-points`
+作用：legacy 点位语义映射。
 
-### `GET /v1/catalogs/{catalog_id}`
-- 作用：查询 catalog 详情。
-- 出参：`PointCatalog`
+请求关键字段：
+- `field_dictionary`
+- `legacy_points` 或 `raw_yaml_text`
 
-### `POST /v1/contexts/build`
-- 作用：从数据源读取快照并构建 `SceneContext`。
-- 入参：`catalog_id`, `fields?`, `at?`, `missing_policy`, `scene_metadata?`
-- 出参：`ContextBuildResult`
+响应：`ParserResult`
 
-## 模板迁移与发布
-### `POST /v1/templates/generate`
-- 作用：生成迁移草案。
-- 入参：`scene_metadata`, `field_dictionary`, `nl_requirements`
-- 出参：`MigrationDraft`
+### `POST /v1/agentic/generate-draft`
+作用：生成迁移草案。
 
+请求关键字段：
+- `scene_metadata`
+- `field_dictionary`
+- `nl_requirements`
+- `parser_result` 可选
+
+响应：`MigrationDraft`
+
+### `POST /v1/agentic/review-draft`
+作用：对失败草案给出修正指令。
+
+请求关键字段：
+- `failed_draft`
+- `validation_report`
+- `quality_report`
+
+响应：`CriticFeedback`
+
+### `POST /v1/agentic/run`
+作用：运行完整自动修正流程。
+
+请求关键字段：
+- `scene_metadata`
+- `field_dictionary`
+- `nl_requirements`
+- `max_iterations`
+- `gate` 可选
+- `regression_samples` 可选
+
+响应：`AgenticRunReport`
+
+## Template API
 ### `POST /v1/templates/validate`
-- 作用：校验草案一致性。
-- 入参：`MigrationDraft`
-- 出参：`MigrationValidationReport`
+输入：`MigrationDraft`
+输出：`MigrationValidationReport`
 
 ### `POST /v1/templates/quality-check`
-- 作用：质量门禁评估。
-- 入参：`draft` 或 `template`（二选一）, `gate?`, `regression_samples?`
-- 出参：`TemplateQualityReport`
+输入：`draft` 或 `template`
+输出：`TemplateQualityReport`
 
 ### `POST /v1/templates/publish`
-- 作用：发布模板版本。
-- 入参：
-  - `draft`
-  - `validate_before_publish`
-  - `enforce_quality_gate`
-  - `quality_gate`
-  - `regression_samples`
-- 出参：`template_id`, `version`, `validation`, `quality`
+输入：`draft` + 发布门禁参数
+输出：`TemplatePublishResponse`
 
 ### `GET /v1/templates/{template_id}`
-- 作用：按模板 ID/版本查询。
-- 出参：`ScenarioTemplate`
+作用：按 `template_id` 和可选 `version` 查询模板。
 
-### `GET /v1/templates/base`
-- 作用：获取官方基线模板列表与 schema。
-
-## 仿真与评估
+## Pipeline API
 ### `POST /v1/pipeline/simulate`
-- 入参：`scene_context` + (`template_id` xor `inline_template`)
-- 出参：`PipelineResult`
+输入：`scene_context` + (`template_id` 或 `inline_template`)
+输出：`PipelineResult`
 
 ### `POST /v1/pipeline/evaluate`
-- 入参：`scenario_id`, `samples` + (`template_id` xor `inline_template`)
-- 出参：`EvaluationReport`
+输入：`samples` + (`template_id` 或 `inline_template`)
+输出：`EvaluationReport`
 
-## 健康检查
+## Catalog API
+### `POST /v1/catalogs/import`
+输入：`mode`, `yaml_text` 或 `yaml_path`
+输出：`catalog_id`, `binding_count`, `warnings`
+
+### `GET /v1/catalogs/{catalog_id}`
+输出：`PointCatalog`
+
+### `POST /v1/contexts/build`
+输入：`catalog_id`, `missing_policy`
+输出：`ContextBuildResult`
+
+## Health
 ### `GET /health`
-- 返回组件状态和计数。
+返回版本、组件状态、模板数量、catalog 数量。
 
-## 错误语义
-- `400`: 业务校验失败（例如质量门禁不通过、快照缺失）。
-- `404`: catalog/template 不存在。
-- `422`: 请求体字段或类型错误。
+## 错误码
+- `400`: 业务校验失败，例如质量门禁未通过。
+- `404`: 资源不存在。
+- `422`: 请求体格式错误。

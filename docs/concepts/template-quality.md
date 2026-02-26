@@ -1,48 +1,35 @@
-# 模板正确性与质量门禁
+# 模板正确性与发布前评分阈值检查
 
-## 为什么需要质量门禁
-能运行不等于可发布。
+## 正确模板定义
+正确模板需要同时满足五层条件：
+1. 结构正确：schema 完整，类型合法。
+2. 语义正确：所有字段引用都能在字典中解析。
+3. 可解性：回归样本下求解成功率达标。
+4. 安全覆盖：关键目标和可控字段有安全规则覆盖。
+5. 回归表现：匹配率和违规率达到门限。
 
-质量门禁用于回答：
-- 模板是否结构完整。
-- 字段语义是否一致。
-- 优化是否可解。
-- 安全规则是否覆盖关键变量。
-- 回归样本下是否稳定。
+## 默认门限
+- `structural_score >= 0.98`
+- `semantic_score >= 0.98`
+- `solvability_score >= 0.95`
+- `guardrail_coverage >= 0.95`
+- `regression_score >= 0.90`
+- `overall_score >= 0.95`
 
-## 五层评估维度
-1. `structural_score`
-   - schema 合法性、字段完整性。
-2. `semantic_score`
-   - 目标/约束/特征/安全规则字段能否在字典中解析。
-3. `solvability_score`
-   - 回归样本中求解器返回 `solved` 的比例。
-4. `guardrail_coverage`
-   - 目标字段 + 可控字段被安全规则覆盖的比例。
-5. `regression_score`
-   - 回归样本上的期望匹配率与违规率综合分。
+## 调用方式
+`POST /v1/templates/quality-check`
 
-## 默认阈值
-- `structural >= 0.98`
-- `semantic >= 0.98`
-- `solvability >= 0.95`
-- `guardrail >= 0.95`
-- `regression >= 0.90`
-- `overall >= 0.95`
+输入：
+1. `draft` 或 `template`
+2. 可选 `gate`
+3. 可选 `regression_samples`
 
-## 如何调用
-- `POST /v1/templates/quality-check`
-- 或直接 `POST /v1/templates/publish`（默认内置质量门禁）
+输出：
+- `TemplateQualityReport`
+- `passed`
+- `issues`
 
-## 结果如何解读
-`passed=false` 时，优先看 `issues`：
-- `STRUCTURAL_LOW`：先修模板结构。
-- `SEMANTIC_LOW`：修字段映射。
-- `SOLVABILITY_LOW`：修约束冲突或求解参数。
-- `GUARDRAIL_LOW`：补安全规则。
-- `REGRESSION_LOW`：补样本或调整目标权重。
-
-## 实战建议
-- 发布前至少提供一组真实分布回归样本。
-- 不要只用合成样本决定最终发布。
-- 把质量结果和模板版本一同归档。
+## 失败排查顺序
+1. 先看 `STRUCTURAL_*` 和 `SEMANTIC_*`。
+2. 再看 `SOLVABILITY_*` 和 `GUARDRAIL_*`。
+3. 最后看 `REGRESSION_*` 和 `OVERALL_*`。

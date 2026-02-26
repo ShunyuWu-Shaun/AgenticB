@@ -1,36 +1,26 @@
-# 术语表（去抽象化）
+# 术语表
 
-本页把常见抽象词换成可操作描述。
+## 迁移草案
+- 英文：MigrationDraft
+- 含义：待发布的结构化配置对象。
 
-## 核心术语
-- **迁移草案（MigrationDraft）**
-  - 含义：待发布模板的提案对象。
-  - 你需要做什么：人工确认 `pending_confirmations` 后再发布。
+## 安全检查结果
+- 英文：GuardrailDecision
+- 含义：优化建议经过安全规则检查后的结果。
+- 常见状态：通过、拦截、裁剪。
 
-- **模板（ScenarioTemplate）**
-  - 含义：预测-优化策略的标准结构。
-  - 你需要做什么：维护版本，不要散落在脚本。
+## 自动修正流程
+- 英文：Reflection Flow
+- 含义：草案失败后，Critic 给出修正指令并触发下一轮生成。
 
-- **安全规则（Guardrail）**
-  - 含义：执行前检查规则，约束建议值范围和变化量。
-  - 你需要做什么：确保覆盖目标字段和可控字段。
+## 发布前评分阈值检查
+- 英文：TemplateQualityGate
+- 含义：发布前的评分下限配置。
 
-- **安全规则判定结果（GuardrailDecision）**
-  - 含义：对优化建议的判定结果。
-  - 结果类型：
-    - 通过（approved=true）
-    - 拦截（approved=false）
-    - 裁剪（approved=true 但值被clip）
+## 点位语义映射
+- 英文：Parser Mapping
+- 含义：legacy 点位名到标准字段名的映射记录。
 
-- **质量门禁（TemplateQualityGate）**
-  - 含义：发布前的评分阈值配置。
-  - 你需要做什么：按场景调阈值，保留变更记录。
-
-- **上下文构建（Context Build）**
-  - 含义：按 catalog 从 Redis/MySQL 拉点位值，组装 `SceneContext`。
-  - 你需要做什么：处理缺失策略（error/drop/zero）。
-
-## 不建议使用的模糊表达
-- **安全规则判定结果**：指优化建议经过安全规则检查后的结果，可为通过、拦截或裁剪。
-- 上线前看看 建议改为 **执行 validate + quality-check 并保存报告**。
-- 模型建议不稳定 建议改为 **回归分数低、违规率高、可解率低**。
+## 可解性
+- 英文：Solvability
+- 含义：在样本上优化器返回 solved 的比例。

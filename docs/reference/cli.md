@@ -1,11 +1,13 @@
 # CLI 命令参考
 
-二进制入口：`easyshift-maas`
+入口：`easyshift-maas`
 
-## 模板与草案
-- `easyshift-maas sample-template --variant energy|quality`
-- `easyshift-maas list-base-templates`
-- `easyshift-maas generate-draft --metadata <json> --fields <json> [--requirement ...]`
+## Agentic
+- `easyshift-maas parse-points --fields <json> [--points <json>] [--yaml <file>]`
+- `easyshift-maas generate-draft --metadata <json> --fields <json> [--parser-result <json>] [--requirement ...]`
+- `easyshift-maas run-agentic --metadata <json> --fields <json> [--points <json>] [--max-iterations 3] [--requirement ...]`
+
+## 校验与评分
 - `easyshift-maas validate-draft --draft <json>`
 - `easyshift-maas quality-check (--template <json> | --draft <json>) [--samples <json>]`
 

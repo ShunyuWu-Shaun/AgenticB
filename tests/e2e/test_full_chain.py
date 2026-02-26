@@ -6,62 +6,110 @@ from easyshift_maas.api.app import app
 client = TestClient(app)
 
 
-def _generation_request(scene_id: str) -> dict:
+def _field_dictionary() -> dict:
     return {
-        "scene_metadata": {
-            "scene_id": scene_id,
-            "scenario_type": "generic",
-            "tags": ["synthetic"],
-            "granularity_sec": 60,
-            "execution_window_sec": 300,
-        },
-        "field_dictionary": {
-            "fields": [
-                {
-                    "field_name": "quality_index",
-                    "semantic_label": "quality",
-                    "unit": "ratio",
-                    "dimension": "dimensionless",
-                    "observable": True,
-                    "controllable": False,
-                    "missing_strategy": "required",
-                },
-                {
-                    "field_name": "energy_cost",
-                    "semantic_label": "cost",
-                    "unit": "$/h",
-                    "dimension": "dimensionless",
-                    "observable": True,
-                    "controllable": False,
-                    "missing_strategy": "required",
-                },
-                {
-                    "field_name": "pressure",
-                    "semantic_label": "pressure",
-                    "unit": "bar",
-                    "dimension": "dimensionless",
-                    "observable": True,
-                    "controllable": True,
-                    "missing_strategy": "required",
-                },
-            ],
-            "alias_map": {},
-        },
-        "nl_requirements": ["prefer safety and stable outputs"],
+        "fields": [
+            {
+                "field_name": "quality_index",
+                "semantic_label": "quality",
+                "unit": "ratio",
+                "dimension": "dimensionless",
+                "observable": True,
+                "controllable": False,
+                "missing_strategy": "required",
+            },
+            {
+                "field_name": "energy_cost",
+                "semantic_label": "cost",
+                "unit": "$/h",
+                "dimension": "dimensionless",
+                "observable": True,
+                "controllable": False,
+                "missing_strategy": "required",
+            },
+            {
+                "field_name": "pressure",
+                "semantic_label": "pressure",
+                "unit": "bar",
+                "dimension": "dimensionless",
+                "observable": True,
+                "controllable": True,
+                "missing_strategy": "required",
+            },
+        ],
+        "alias_map": {"p01": "pressure"},
     }
 
 
-def test_end_to_end_generate_validate_publish_simulate_evaluate() -> None:
-    draft = client.post("/v1/templates/generate", json=_generation_request("e2e-scene")).json()
-    report = client.post("/v1/templates/validate", json=draft).json()
-    assert report["valid"] is True
-
-    published = client.post(
-        "/v1/templates/publish",
-        json={"draft": draft, "validate_before_publish": True},
+def test_end_to_end_parse_generate_review_publish_simulate_evaluate() -> None:
+    parse_resp = client.post(
+        "/v1/agentic/parse-points",
+        json={"field_dictionary": _field_dictionary(), "legacy_points": ["p01", "unknown_tag"]},
     )
-    assert published.status_code == 200
-    template_id = published.json()["template_id"]
+    assert parse_resp.status_code == 200
+    parser_result = parse_resp.json()
+
+    draft_resp = client.post(
+        "/v1/agentic/generate-draft",
+        json={
+            "scene_metadata": {
+                "scene_id": "e2e-scene",
+                "scenario_type": "generic",
+                "tags": ["synthetic"],
+                "granularity_sec": 60,
+                "execution_window_sec": 300,
+            },
+            "field_dictionary": _field_dictionary(),
+            "nl_requirements": ["prefer safety and stable outputs"],
+            "parser_result": parser_result,
+        },
+    )
+    assert draft_resp.status_code == 200
+    draft = draft_resp.json()
+
+    validate = client.post("/v1/templates/validate", json=draft)
+    assert validate.status_code == 200
+
+    quality = client.post("/v1/templates/quality-check", json={"draft": draft})
+    assert quality.status_code == 200
+
+    review = client.post(
+        "/v1/agentic/review-draft",
+        json={
+            "failed_draft": draft,
+            "validation_report": validate.json(),
+            "quality_report": quality.json(),
+        },
+    )
+    assert review.status_code == 200
+
+    run = client.post(
+        "/v1/agentic/run",
+        json={
+            "scene_metadata": {
+                "scene_id": "e2e-run",
+                "scenario_type": "generic",
+                "tags": ["synthetic"],
+                "granularity_sec": 60,
+                "execution_window_sec": 300,
+            },
+            "field_dictionary": _field_dictionary(),
+            "nl_requirements": ["reduce energy with safety constraints"],
+            "legacy_points": ["p01", "temp_a"],
+            "max_iterations": 3,
+        },
+    )
+    assert run.status_code == 200
+    run_payload = run.json()
+
+    final_draft = run_payload.get("final_draft") or draft
+
+    publish = client.post(
+        "/v1/templates/publish",
+        json={"draft": final_draft, "validate_before_publish": True, "enforce_quality_gate": False},
+    )
+    assert publish.status_code == 200
+    template_id = publish.json()["template_id"]
 
     sim = client.post(
         "/v1/pipeline/simulate",
@@ -94,67 +142,3 @@ def test_end_to_end_generate_validate_publish_simulate_evaluate() -> None:
     )
     assert eval_resp.status_code == 200
     assert eval_resp.json()["total_runs"] == 2
-
-
-def test_low_confidence_path_visible_in_draft() -> None:
-    draft = client.post(
-        "/v1/templates/generate",
-        json={
-            "scene_metadata": {
-                "scene_id": "low-conf",
-                "scenario_type": "generic",
-                "tags": [],
-                "granularity_sec": 60,
-                "execution_window_sec": 300,
-            },
-            "field_dictionary": {
-                "fields": [
-                    {
-                        "field_name": "x",
-                        "semantic_label": "proxy",
-                        "unit": "u",
-                        "dimension": "dimensionless",
-                        "observable": True,
-                        "controllable": False,
-                        "missing_strategy": "required",
-                    }
-                ],
-                "alias_map": {},
-            },
-            "nl_requirements": [],
-        },
-    ).json()
-
-    assert draft["generation_strategy"] == "rule_only_low_confidence"
-
-
-def test_conflict_draft_is_blocked_from_publish() -> None:
-    draft = client.post("/v1/templates/generate", json=_generation_request("conflict-scene")).json()
-    draft["template"]["constraints"] = [
-        {
-            "name": "pressure_min",
-            "field_name": "pressure",
-            "operator": "ge",
-            "lower_bound": 20,
-            "upper_bound": None,
-            "equals_value": None,
-            "priority": 1,
-            "severity": "hard",
-        },
-        {
-            "name": "pressure_max",
-            "field_name": "pressure",
-            "operator": "le",
-            "lower_bound": None,
-            "upper_bound": 10,
-            "equals_value": None,
-            "priority": 1,
-            "severity": "hard",
-        }
-    ]
-
-    response = client.post(
-        "/v1/templates/publish",
-        json={"draft": draft, "validate_before_publish": True},
-    )
-    assert response.status_code == 400

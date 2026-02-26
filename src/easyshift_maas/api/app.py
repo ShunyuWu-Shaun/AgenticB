@@ -7,16 +7,22 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from easyshift_maas.agentic.migration_assistant import HybridMigrationAssistant
+from easyshift_maas.agentic.critic_agent import CriticAgent
+from easyshift_maas.agentic.generator_agent import GeneratorAgent
+from easyshift_maas.agentic.langgraph_workflow import LangGraphMigrationWorkflow
+from easyshift_maas.agentic.parser_agent import ParserAgent
 from easyshift_maas.agentic.template_validator import TemplateValidator
 from easyshift_maas.core.contracts import (
+    AgenticRunReport,
     CatalogLoadMode,
     ContextBuildResult,
+    CriticFeedback,
     DataSourceProfile,
     EvaluationReport,
     FieldDictionary,
     MigrationDraft,
     MigrationValidationReport,
+    ParserResult,
     PipelineResult,
     ScenarioTemplate,
     SceneContext,
@@ -33,12 +39,11 @@ from easyshift_maas.ingestion.providers.mysql_provider import MySQLSnapshotProvi
 from easyshift_maas.ingestion.providers.redis_provider import RedisSnapshotProvider
 from easyshift_maas.ingestion.repository import InMemoryCatalogRepository, InMemoryDataSourceRegistry
 from easyshift_maas.ingestion.snapshot_provider import CompositeSnapshotProvider
+from easyshift_maas.llm.client import RoleBasedLLMClient
 from easyshift_maas.observability import instrument_fastapi
 from easyshift_maas.quality.template_quality import TemplateQualityEvaluator
 from easyshift_maas.security.secrets import ChainedSecretResolver
-from easyshift_maas.templates.base import BaseTemplateInfo, list_base_templates
 from easyshift_maas.templates.repository import InMemoryTemplateRepository
-from easyshift_maas.templates.schema import scenario_template_schema
 
 
 class ErrorResponse(BaseModel):
@@ -47,39 +52,45 @@ class ErrorResponse(BaseModel):
     detail: Any
 
 
-class TemplateGenerateRequest(BaseModel):
+class ParsePointsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    scene_metadata: SceneMetadata = Field(
-        examples=[
-            {
-                "scene_id": "synthetic-energy",
-                "scenario_type": "efficiency",
-                "tags": ["synthetic"],
-                "granularity_sec": 60,
-                "execution_window_sec": 300,
-            }
-        ]
-    )
-    field_dictionary: FieldDictionary = Field(
-        examples=[
-            {
-                "fields": [
-                    {
-                        "field_name": "energy_cost",
-                        "semantic_label": "cost",
-                        "unit": "$/h",
-                        "dimension": "dimensionless",
-                        "observable": True,
-                        "controllable": False,
-                        "missing_strategy": "required",
-                    }
-                ],
-                "alias_map": {},
-            }
-        ]
-    )
-    nl_requirements: list[str] = Field(default_factory=list, examples=[["prioritize stable operation"]])
+    field_dictionary: FieldDictionary
+    legacy_points: list[str] = Field(default_factory=list)
+    raw_yaml_text: Optional[str] = None
+
+
+class GenerateDraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scene_metadata: SceneMetadata
+    field_dictionary: FieldDictionary
+    nl_requirements: list[str] = Field(default_factory=list)
+    parser_result: Optional[ParserResult] = None
+    correction_instruction: Optional[str] = None
+    iteration: int = Field(default=1, ge=1, le=20)
+
+
+class ReviewDraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    failed_draft: MigrationDraft
+    validation_report: MigrationValidationReport
+    quality_report: TemplateQualityReport
+
+
+class AgenticRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scene_metadata: SceneMetadata
+    field_dictionary: FieldDictionary
+    nl_requirements: list[str] = Field(default_factory=list)
+    legacy_points: list[str] = Field(default_factory=list)
+    raw_yaml_text: Optional[str] = None
+    max_iterations: int = Field(default=3, ge=1, le=8)
+    gate: TemplateQualityGate = Field(default_factory=TemplateQualityGate)
+    regression_samples: list[SimulationSample] = Field(default_factory=list)
+    publish_on_pass: bool = False
 
 
 class TemplatePublishRequest(BaseModel):
@@ -104,9 +115,7 @@ class TemplatePublishResponse(BaseModel):
 class SimulateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    scene_context: SceneContext = Field(
-        examples=[{"values": {"energy_cost": 100.0, "boiler_temp": 560.0}, "metadata": {}}]
-    )
+    scene_context: SceneContext
     template_id: Optional[str] = None
     version: Optional[str] = None
     inline_template: Optional[ScenarioTemplate] = None
@@ -124,17 +133,7 @@ class EvaluateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenario_id: str
-    samples: list[SimulationSample] = Field(
-        default_factory=list,
-        examples=[
-            [
-                {
-                    "context": {"values": {"energy_cost": 100.0, "boiler_temp": 560.0}, "metadata": {}},
-                    "expected_approved": True,
-                }
-            ]
-        ],
-    )
+    samples: list[SimulationSample] = Field(default_factory=list)
     template_id: Optional[str] = None
     version: Optional[str] = None
     inline_template: Optional[ScenarioTemplate] = None
@@ -202,18 +201,27 @@ class QualityCheckRequest(BaseModel):
         return self
 
 
-class BaseTemplatesResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    templates: list[BaseTemplateInfo]
-    template_schema: dict[str, Any]
-
-
-app = FastAPI(title="EasyShift-MaaS", version="0.2.0")
+app = FastAPI(title="EasyShift-MaaS", version="0.3.0")
 instrument_fastapi(app)
 
-assistant = HybridMigrationAssistant()
+llm_router = RoleBasedLLMClient()
+shared_llm = llm_router if llm_router.is_available() else None
+
 validator = TemplateValidator()
+pipeline = PredictionOptimizationPipeline()
+quality_evaluator = TemplateQualityEvaluator(pipeline=pipeline, validator=validator)
+
+parser_agent = ParserAgent(llm_client=shared_llm)
+generator_agent = GeneratorAgent(llm_client=shared_llm)
+critic_agent = CriticAgent(llm_client=shared_llm)
+workflow = LangGraphMigrationWorkflow(
+    parser_agent=parser_agent,
+    generator_agent=generator_agent,
+    critic_agent=critic_agent,
+    validator=validator,
+    quality_evaluator=quality_evaluator,
+)
+
 template_repository = InMemoryTemplateRepository()
 catalog_repository = InMemoryCatalogRepository()
 datasource_registry = InMemoryDataSourceRegistry()
@@ -222,8 +230,6 @@ secret_resolver = ChainedSecretResolver()
 snapshot_provider = CompositeSnapshotProvider(
     providers=[RedisSnapshotProvider(), MySQLSnapshotProvider()]
 )
-pipeline = PredictionOptimizationPipeline()
-quality_evaluator = TemplateQualityEvaluator(pipeline=pipeline, validator=validator)
 
 
 @app.post("/v1/catalogs/import", response_model=CatalogImportResponse)
@@ -245,10 +251,7 @@ def import_catalog(request: CatalogImportRequest) -> CatalogImportResponse:
     )
 
 
-@app.get(
-    "/v1/catalogs/{catalog_id}",
-    responses={404: {"model": ErrorResponse}},
-)
+@app.get("/v1/catalogs/{catalog_id}", responses={404: {"model": ErrorResponse}})
 def get_catalog(catalog_id: str):
     try:
         return catalog_repository.get(catalog_id)
@@ -300,13 +303,54 @@ def build_context(request: ContextBuildRequest) -> ContextBuildResult:
     return ContextBuildResult(scene_context=context, snapshot=snapshot)
 
 
-@app.post("/v1/templates/generate", response_model=MigrationDraft)
-def generate_template(request: TemplateGenerateRequest) -> MigrationDraft:
-    return assistant.generate(
+@app.post("/v1/agentic/parse-points", response_model=ParserResult)
+def parse_points(request: ParsePointsRequest) -> ParserResult:
+    return parser_agent.parse(
+        field_dictionary=request.field_dictionary,
+        legacy_points=request.legacy_points,
+        raw_yaml_text=request.raw_yaml_text,
+    )
+
+
+@app.post("/v1/agentic/generate-draft", response_model=MigrationDraft)
+def generate_draft(request: GenerateDraftRequest) -> MigrationDraft:
+    return generator_agent.generate(
         scene_metadata=request.scene_metadata,
         field_dictionary=request.field_dictionary,
         nl_requirements=request.nl_requirements,
+        parser_result=request.parser_result,
+        correction_instruction=request.correction_instruction,
+        iteration=request.iteration,
     )
+
+
+@app.post("/v1/agentic/review-draft", response_model=CriticFeedback)
+def review_draft(request: ReviewDraftRequest) -> CriticFeedback:
+    return critic_agent.review(
+        failed_draft=request.failed_draft,
+        validation_report=request.validation_report,
+        quality_report=request.quality_report,
+    )
+
+
+@app.post("/v1/agentic/run", response_model=AgenticRunReport)
+def run_agentic(request: AgenticRunRequest) -> AgenticRunReport:
+    report = workflow.run(
+        scene_metadata=request.scene_metadata,
+        field_dictionary=request.field_dictionary,
+        nl_requirements=request.nl_requirements,
+        legacy_points=request.legacy_points,
+        raw_yaml_text=request.raw_yaml_text,
+        regression_samples=request.regression_samples,
+        gate=request.gate,
+        max_iterations=request.max_iterations,
+    )
+
+    if request.publish_on_pass and report.status.value == "approved" and report.final_draft is not None:
+        template_repository.publish(report.final_draft.template)
+        report.published = True
+
+    return report
 
 
 @app.post("/v1/templates/validate", response_model=MigrationValidationReport)
@@ -321,14 +365,6 @@ def quality_check_template(request: QualityCheckRequest) -> TemplateQualityRepor
         template=template,
         regression_samples=request.regression_samples,
         gate=request.gate,
-    )
-
-
-@app.get("/v1/templates/base", response_model=BaseTemplatesResponse)
-def list_templates_base() -> BaseTemplatesResponse:
-    return BaseTemplatesResponse(
-        templates=list_base_templates(),
-        template_schema=scenario_template_schema(),
     )
 
 
@@ -450,15 +486,18 @@ def evaluate(request: EvaluateRequest) -> EvaluationReport:
 def health() -> dict[str, Any]:
     return {
         "status": "ok",
+        "version": "0.3.0",
         "templates": len(template_repository.list_template_ids()),
         "catalogs": len(catalog_repository.list_catalog_ids()),
         "data_sources": len(datasource_registry.list_profiles()),
         "components": {
-            "migration_assistant": "ready",
-            "template_validator": "ready",
-            "template_quality": "ready",
-            "snapshot_provider": "ready",
+            "parser_agent": "ready",
+            "generator_agent": "ready",
+            "critic_agent": "ready",
+            "deterministic_validator": "ready",
+            "quality_evaluator": "ready",
             "pipeline": "ready",
+            "llm_router": "enabled" if shared_llm is not None else "fallback_only",
         },
     }
 

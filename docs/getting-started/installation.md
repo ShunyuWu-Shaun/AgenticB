@@ -2,33 +2,38 @@
 
 ## 环境要求
 - Python `3.11+`
-- 建议：Docker / Docker Compose（用于本地联调 Redis/MySQL）
+- 建议：Docker / Docker Compose（本地联调 Redis/MySQL）
 
-## 方式一：本地 Python 运行
+## 本地运行
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e '.[dev]'
+pip install -e '.[dev,docs]'
 uvicorn easyshift_maas.api.app:app --reload --port 8000
 ```
 
-服务启动后：
+服务地址：
 - OpenAPI: `http://127.0.0.1:8000/docs`
 - Health: `http://127.0.0.1:8000/health`
 
-## 方式二：Docker Compose 联调
+## LLM 环境变量
+```bash
+export EASYSHIFT_LLM_VENDOR=qwen
+export EASYSHIFT_LLM_API_KEY=your_api_key
+export EASYSHIFT_LLM_MODEL_PARSER=qwen-plus
+export EASYSHIFT_LLM_MODEL_GENERATOR=qwen-plus
+export EASYSHIFT_LLM_MODEL_CRITIC=qwen-plus
+export EASYSHIFT_LLM_TIMEOUT_SEC=30
+```
+
+支持供应商：`kimi`、`qwen`、`deepseek`、`openai`。
+
+## Docker Compose
 ```bash
 docker compose up --build
 ```
 
-默认包含：
-- `easyshift-api`
-- `redis`
-- `mysql`
-
-默认开发密钥文件位置：`deploy/secrets/`。
-
-## 可选：Nuitka 构建可执行文件
+## Nuitka 构建
 ```bash
 pip install '.[build]'
 ./scripts/build_nuitka.sh
@@ -36,10 +41,11 @@ pip install '.[build]'
 
 输出：
 - `dist/easyshift-maas`（CLI）
-- `dist/easyshift-maas-api`（API 服务）
+- `dist/easyshift-maas-api`（API）
 
-## 运行测试
+## 测试与扫描
 ```bash
-pytest
+.venv/bin/pytest -q
 python tools/sensitive_scan.py
+mkdocs build --strict
 ```

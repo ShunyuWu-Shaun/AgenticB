@@ -1,50 +1,44 @@
 # 迁移草案定义
 
-## 定义
-`MigrationDraft` 是迁移建议的标准结构。
+`MigrationDraft` 是发布前的标准配置载体。它记录了目标、约束、安全规则和来源信息。
 
-它包含两部分：
-- **模板本体**：`ScenarioTemplate`
-- **迁移元信息**：置信度、风险、待确认项、生成策略
+## 为什么需要迁移草案
+1. 把场景知识从脚本中抽离成可版本化对象。
+2. 让 LLM 输出进入可校验结构，支持版本管理和审计。
+3. 让失败定位、回归比较和发布审计有统一依据。
 
-## 字段级说明
-### `template`
-- `template_id/version`: 模板标识与版本。
-- `scene_metadata`: 场景标识、时间粒度、执行窗口。
-- `field_dictionary`: 字段语义字典。
-- `objective`: 目标函数定义（最小化/最大化 + 权重）。
-- `constraints`: 硬约束/软约束（上下界/等式）。
-- `prediction`: 预测特征与时域。
-- `optimization`: 求解器预算与收敛参数。
-- `guardrail`: 安全规则（最小/最大/最大变化量）。
+## 字段说明
+1. `template`
+- 真正执行的场景模板，包含 objective/constraints/guardrail/prediction。
 
-### `confidence`
-迁移助手对草案可靠性的估计值（0~1）。
+2. `confidence`
+- 当前草案置信度，范围 0 到 1。
 
-### `pending_confirmations`
-必须人工确认的信息，比如：
-- 权重是否符合业务优先级。
-- 约束强弱（hard/soft）是否正确。
+3. `pending_confirmations`
+- 需要人工确认的事项。
 
-### `risks`
-风险清单，如：
-- 约束覆盖不足。
-- 安全规则覆盖不足。
+4. `risks`
+- 风险项列表，例如 LLM 降级、字段语义不完整。
 
-### `generation_strategy`
-草案生成方式，例如：
-- `rule_only`
-- `hybrid_llm_rule`
-- `rule_only_low_confidence`
+5. `generation_strategy`
+- 草案生成路径，例如 `llm_primary` 或 `rule_fallback`。
 
-## 最小可发布草案检查清单
-- `template.objective.terms` 非空。
-- `prediction.feature_fields` 均在 `field_dictionary` 中。
-- `constraints` 无冲突。
-- 安全规则覆盖目标字段和可控字段。
-- `validate` 与 `quality-check` 均通过。
+6. `trace`
+- 自动修正流程的每轮记录。
 
-## 实践建议
-- 把业务关键字段先标成 `controllable=true`，再补安全规则。
-- `pending_confirmations` 要作为发布前工单项关闭。
-- 每次发布必须保存草案快照以支持回溯。
+7. `source_mappings`
+- legacy 点位到标准字段的映射来源。
+
+8. `llm_metadata`
+- 使用的模型和供应商元信息。
+
+## 发布前检查
+要进入发布，草案必须通过：
+1. `POST /v1/templates/validate`
+2. `POST /v1/templates/quality-check`
+
+## 常见失败原因
+1. objective 字段不存在于 `field_dictionary`。
+2. 同一字段约束相互冲突。
+3. 关键目标字段缺少安全规则。
+4. 回归样本中违规率高，评分低于阈值。

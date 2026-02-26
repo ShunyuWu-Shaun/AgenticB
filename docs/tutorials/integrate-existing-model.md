@@ -1,6 +1,6 @@
 # 教程：集成现有预测模型
 
-目标：把你已有的模型/求解器接入 EasyShift-MaaS，而不是重写业务逻辑。
+目标：把你已有的模型/求解器接入 EasyShift-MaaS，复用现有业务逻辑。
 
 ## 可插拔接口
 - `PredictorProtocol.predict(context, spec) -> PredictionResult`

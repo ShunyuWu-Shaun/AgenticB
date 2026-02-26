@@ -5,13 +5,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-from easyshift_maas.agentic.migration_assistant import HybridMigrationAssistant
+from easyshift_maas.agentic.critic_agent import CriticAgent
+from easyshift_maas.agentic.generator_agent import GeneratorAgent
+from easyshift_maas.agentic.langgraph_workflow import LangGraphMigrationWorkflow
+from easyshift_maas.agentic.parser_agent import ParserAgent
 from easyshift_maas.agentic.template_validator import TemplateValidator
 from easyshift_maas.core.contracts import (
     CatalogLoadMode,
     DataSourceProfile,
     FieldDictionary,
-    PointCatalog,
     MigrationDraft,
     ScenarioTemplate,
     SceneContext,
@@ -22,17 +24,12 @@ from easyshift_maas.core.contracts import (
     TemplateQualityGate,
 )
 from easyshift_maas.core.pipeline import PredictionOptimizationPipeline
-from easyshift_maas.examples.synthetic_templates import (
-    build_energy_efficiency_template,
-    build_quality_stability_template,
-)
 from easyshift_maas.ingestion.catalog_loader import YamlCatalogLoader
 from easyshift_maas.ingestion.providers.mysql_provider import MySQLSnapshotProvider
 from easyshift_maas.ingestion.providers.redis_provider import RedisSnapshotProvider
 from easyshift_maas.ingestion.snapshot_provider import CompositeSnapshotProvider
 from easyshift_maas.quality.template_quality import TemplateQualityEvaluator
 from easyshift_maas.security.secrets import ChainedSecretResolver
-from easyshift_maas.templates.base import list_base_templates
 
 
 def _load_json(path: str) -> Any:
@@ -43,26 +40,70 @@ def _print_json(payload: Any) -> None:
     print(json.dumps(payload, indent=2, ensure_ascii=False))
 
 
-def cmd_sample_template(variant: str) -> None:
-    if variant == "energy":
-        template = build_energy_efficiency_template()
-    else:
-        template = build_quality_stability_template()
-    _print_json(template.model_dump(mode="json"))
+def cmd_parse_points(fields_path: str, points_path: str | None, yaml_path: str | None) -> None:
+    field_dictionary = FieldDictionary.model_validate(_load_json(fields_path))
+    legacy_points = _load_json(points_path) if points_path else []
+    yaml_text = Path(yaml_path).read_text(encoding="utf-8") if yaml_path else None
+
+    result = ParserAgent(llm_client=None).parse(
+        field_dictionary=field_dictionary,
+        legacy_points=legacy_points,
+        raw_yaml_text=yaml_text,
+    )
+    _print_json(result.model_dump(mode="json"))
 
 
-def cmd_list_base_templates() -> None:
-    items = [item.model_dump(mode="json") for item in list_base_templates()]
-    _print_json(items)
-
-
-def cmd_generate_draft(metadata_path: str, fields_path: str, requirements: list[str]) -> None:
+def cmd_generate_draft(
+    metadata_path: str,
+    fields_path: str,
+    requirements: list[str],
+    parser_result_path: str | None,
+) -> None:
     metadata = SceneMetadata.model_validate(_load_json(metadata_path))
     field_dictionary = FieldDictionary.model_validate(_load_json(fields_path))
+    parser_result = None
+    if parser_result_path:
+        from easyshift_maas.core.contracts import ParserResult
 
-    assistant = HybridMigrationAssistant()
-    draft = assistant.generate(metadata, field_dictionary=field_dictionary, nl_requirements=requirements)
+        parser_result = ParserResult.model_validate(_load_json(parser_result_path))
+
+    draft = GeneratorAgent(llm_client=None).generate(
+        scene_metadata=metadata,
+        field_dictionary=field_dictionary,
+        nl_requirements=requirements,
+        parser_result=parser_result,
+    )
     _print_json(draft.model_dump(mode="json"))
+
+
+def cmd_run_agentic(
+    metadata_path: str,
+    fields_path: str,
+    requirements: list[str],
+    points_path: str | None,
+    max_iterations: int,
+) -> None:
+    metadata = SceneMetadata.model_validate(_load_json(metadata_path))
+    field_dictionary = FieldDictionary.model_validate(_load_json(fields_path))
+    legacy_points = _load_json(points_path) if points_path else []
+
+    workflow = LangGraphMigrationWorkflow(
+        parser_agent=ParserAgent(llm_client=None),
+        generator_agent=GeneratorAgent(llm_client=None),
+        critic_agent=CriticAgent(llm_client=None),
+        validator=TemplateValidator(),
+        quality_evaluator=TemplateQualityEvaluator(),
+    )
+    report = workflow.run(
+        scene_metadata=metadata,
+        field_dictionary=field_dictionary,
+        nl_requirements=requirements,
+        legacy_points=legacy_points,
+        gate=TemplateQualityGate(),
+        regression_samples=[],
+        max_iterations=max_iterations,
+    )
+    _print_json(report.model_dump(mode="json"))
 
 
 def cmd_validate_draft(draft_path: str) -> None:
@@ -108,6 +149,8 @@ def cmd_build_context(
     fields: list[str],
     missing_policy: str,
 ) -> None:
+    from easyshift_maas.core.contracts import PointCatalog
+
     catalog = PointCatalog.model_validate(_load_json(catalog_path))
     profiles = [DataSourceProfile.model_validate(item) for item in _load_json(profiles_path)]
 
@@ -143,15 +186,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="EasyShift-MaaS CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sample = sub.add_parser("sample-template", help="Print a synthetic template")
-    sample.add_argument("--variant", choices=["energy", "quality"], default="energy")
+    parse = sub.add_parser("parse-points", help="Map legacy points to canonical fields")
+    parse.add_argument("--fields", required=True)
+    parse.add_argument("--points")
+    parse.add_argument("--yaml")
 
-    sub.add_parser("list-base-templates", help="List official base templates")
-
-    gen = sub.add_parser("generate-draft", help="Generate migration draft from metadata and field dictionary")
+    gen = sub.add_parser("generate-draft", help="Generate migration draft")
     gen.add_argument("--metadata", required=True)
     gen.add_argument("--fields", required=True)
+    gen.add_argument("--parser-result")
     gen.add_argument("--requirement", action="append", default=[])
+
+    run_agentic = sub.add_parser("run-agentic", help="Run parser->generator->critic reflection flow")
+    run_agentic.add_argument("--metadata", required=True)
+    run_agentic.add_argument("--fields", required=True)
+    run_agentic.add_argument("--points")
+    run_agentic.add_argument("--max-iterations", type=int, default=3)
+    run_agentic.add_argument("--requirement", action="append", default=[])
 
     validate = sub.add_parser("validate-draft", help="Validate migration draft JSON")
     validate.add_argument("--draft", required=True)
@@ -183,16 +234,22 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
-    if args.command == "sample-template":
-        cmd_sample_template(args.variant)
-        return
-
-    if args.command == "list-base-templates":
-        cmd_list_base_templates()
+    if args.command == "parse-points":
+        cmd_parse_points(args.fields, args.points, args.yaml)
         return
 
     if args.command == "generate-draft":
-        cmd_generate_draft(args.metadata, args.fields, args.requirement)
+        cmd_generate_draft(args.metadata, args.fields, args.requirement, args.parser_result)
+        return
+
+    if args.command == "run-agentic":
+        cmd_run_agentic(
+            metadata_path=args.metadata,
+            fields_path=args.fields,
+            requirements=args.requirement,
+            points_path=args.points,
+            max_iterations=args.max_iterations,
+        )
         return
 
     if args.command == "validate-draft":

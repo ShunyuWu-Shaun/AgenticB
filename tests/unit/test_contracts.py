@@ -1,12 +1,15 @@
 import pytest
 
 from easyshift_maas.core.contracts import (
+    AgenticRunStatus,
     ConstraintOperator,
     ConstraintSpec,
+    MigrationDraft,
     ObjectiveDirection,
     ObjectiveSpec,
     ObjectiveTerm,
 )
+from easyshift_maas.examples.synthetic_templates import build_energy_efficiency_template
 
 
 def test_objective_weights_are_normalized() -> None:
@@ -31,3 +34,17 @@ def test_invalid_between_constraint_raises() -> None:
             lower_bound=10,
             upper_bound=1,
         )
+
+
+def test_migration_draft_has_agentic_trace_fields() -> None:
+    template = build_energy_efficiency_template()
+    draft = MigrationDraft(template=template, confidence=0.8)
+
+    assert draft.trace == []
+    assert draft.source_mappings == []
+    assert isinstance(draft.llm_metadata, dict)
+
+
+def test_agentic_status_enum_values() -> None:
+    assert AgenticRunStatus.APPROVED.value == "approved"
+    assert AgenticRunStatus.BLOCKED.value == "blocked"

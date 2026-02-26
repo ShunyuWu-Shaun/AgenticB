@@ -8,7 +8,7 @@ client = TestClient(app)
 
 def test_publish_error_contains_structured_report() -> None:
     draft_resp = client.post(
-        "/v1/templates/generate",
+        "/v1/agentic/generate-draft",
         json={
             "scene_metadata": {
                 "scene_id": "err-scene",
@@ -36,7 +36,6 @@ def test_publish_error_contains_structured_report() -> None:
     )
     draft = draft_resp.json()
 
-    # Deliberately create objective/guardrail mismatch to fail strict validator.
     draft["template"]["guardrail"]["rules"] = []
 
     publish_resp = client.post(

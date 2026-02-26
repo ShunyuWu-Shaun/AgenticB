@@ -1,30 +1,27 @@
 # EasyShift-MaaS 文档
 
-EasyShift-MaaS 是一个面向工业/B 端场景的 **迁移型 Agentic + 预测-优化复用框架**。
+![EasyShift-MaaS Logo](assets/branding/logo.png)
 
-它主要解决三件事：
-1. 把现场零散点位配置（通常是 YAML + Redis/MySQL 键）整理成统一的数据契约。
-2. 把旧场景的预测-优化逻辑迁移成可复用模板，而不是散落脚本。
-3. 在发布前做可解释的质量校验，避免能跑但不可靠的模板上线。
+EasyShift-MaaS 是用于工业预测-优化配置迁移的多 Agent 框架。
 
-## 你可以得到什么
-- 统一点位模型：`PointCatalog` + `FieldDictionary`
-- 统一迁移草案：`MigrationDraft`
-- 统一执行链：预测 -> 优化 -> 安全规则判定 -> 仿真输出
-- 统一发布门禁：结构校验 + 语义校验 + 可解性 + 安全覆盖 + 回归结果
+它的分工明确：
+1. LLM 负责语义理解与结构化草案生成。
+2. 确定性代码负责校验、评分和阻断。
+3. 自动修正流程在失败后给出下一轮修改建议。
 
-## 这个项目不做什么
-- 不直接下发自动闭环控制指令。
-- 不携带任何商用 demo 代码或数据。
+![EasyShift-MaaS Framework](assets/branding/framework.png)
+
+## 核心价值
+1. 把 legacy 点位名称转换成标准字段字典。
+2. 把自然语言需求转换成可发布的迁移草案。
+3. 在发布前统一执行质量门禁，降低错误配置上线风险。
 
 ## 推荐阅读顺序
 1. [项目定位](getting-started/overview.md)
 2. [10分钟上手](getting-started/quickstart.md)
-3. [迁移草案定义](concepts/migration-draft.md)
-4. [模板正确性与质量门禁](concepts/template-quality.md)
-5. [标准YAML工业流程教程](tutorials/industrial-standard-yaml.md)
+3. [架构与运行逻辑](concepts/architecture.md)
+4. [迁移草案定义](concepts/migration-draft.md)
+5. [HTTP API](reference/http-api.md)
 
-## 在线文档发布
-- GitHub Pages（默认）：`https://shunyuwu-shaun.github.io/EasyShift-MaaS/`
-
-> 若页面暂未出现，请确认仓库 Settings -> Pages 已启用 `GitHub Actions` 作为 Source。
+## 文档站发布地址
+- [https://shunyuwu-shaun.github.io/EasyShift-MaaS/](https://shunyuwu-shaun.github.io/EasyShift-MaaS/)

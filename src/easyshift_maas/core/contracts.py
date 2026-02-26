@@ -65,6 +65,12 @@ class SnapshotMissingPolicy(str, Enum):
     ZERO = "zero"
 
 
+class AgenticRunStatus(str, Enum):
+    APPROVED = "approved"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+
+
 class SceneMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -284,6 +290,59 @@ class ScenarioTemplate(BaseModel):
     created_at: datetime = Field(default_factory=now_utc)
 
 
+class ParserMapping(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    legacy_name: str
+    standard_name: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    reasoning: str = ""
+
+
+class ParserResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mappings: list[ParserMapping] = Field(default_factory=list)
+    unmapped_points: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    strategy: str = "rule_fallback"
+    warnings: list[str] = Field(default_factory=list)
+
+
+class CriticFeedback(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    is_fatal_error: bool = False
+    analysis: str
+    correction_instruction: str
+    confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+
+
+class ReflectionStep(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    iteration: int = Field(ge=1)
+    draft_id: Optional[str] = None
+    validation_passed: bool = False
+    quality_passed: bool = False
+    validation_errors: list[str] = Field(default_factory=list)
+    quality_errors: list[str] = Field(default_factory=list)
+    critic_feedback: Optional[CriticFeedback] = None
+    timestamp: datetime = Field(default_factory=now_utc)
+
+
+class LLMProviderConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider_name: str = "openai_compatible"
+    vendor: str = "custom"
+    base_url: Optional[str] = None
+    api_key_env: str = "EASYSHIFT_LLM_API_KEY"
+    model: str
+    temperature: float = Field(default=0.1, ge=0.0, le=2.0)
+    timeout_s: int = Field(default=30, ge=1, le=300)
+
+
 class MigrationRisk(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -301,6 +360,9 @@ class MigrationDraft(BaseModel):
     pending_confirmations: list[str] = Field(default_factory=list)
     risks: list[MigrationRisk] = Field(default_factory=list)
     generation_strategy: str = "rule_only"
+    trace: list[ReflectionStep] = Field(default_factory=list)
+    source_mappings: list[ParserMapping] = Field(default_factory=list)
+    llm_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class MigrationValidationIssue(BaseModel):
@@ -423,3 +485,31 @@ class EvaluationReport(BaseModel):
     mean_objective: float
     violation_rate: float = Field(ge=0.0, le=1.0)
     expectation_match_rate: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+
+class AgenticRunState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str = Field(default_factory=lambda: f"run-{uuid4().hex}")
+    scene_metadata: SceneMetadata
+    field_dictionary: FieldDictionary
+    nl_requirements: list[str] = Field(default_factory=list)
+    parser_result: Optional[ParserResult] = None
+    current_draft: Optional[MigrationDraft] = None
+    reflections: list[ReflectionStep] = Field(default_factory=list)
+    iteration: int = 0
+
+
+class AgenticRunReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    status: AgenticRunStatus
+    parser_result: Optional[ParserResult] = None
+    final_draft: Optional[MigrationDraft] = None
+    validation: Optional[MigrationValidationReport] = None
+    quality: Optional[TemplateQualityReport] = None
+    reflections: list[ReflectionStep] = Field(default_factory=list)
+    blocked_reason: Optional[str] = None
+    iterations_used: int = Field(default=0, ge=0)
+    published: bool = False

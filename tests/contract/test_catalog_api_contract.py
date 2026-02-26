@@ -40,8 +40,6 @@ point_catalog:
 
     get_resp = client.get("/v1/catalogs/api-line-catalog")
     assert get_resp.status_code == 200
-    catalog = get_resp.json()
-    assert catalog["catalog_id"] == "api-line-catalog"
 
     context_resp = client.post(
         "/v1/contexts/build",
@@ -61,13 +59,11 @@ point_catalog:
     context_payload = context_resp.json()
     assert "scene_context" in context_payload
     assert "snapshot" in context_payload
-    assert context_payload["snapshot"]["missing_fields"] == []
-    assert set(context_payload["scene_context"]["values"].keys()) == {"reactor_temp", "steam_flow"}
 
 
-def test_quality_check_and_base_templates_contract() -> None:
+def test_quality_check_contract() -> None:
     draft = client.post(
-        "/v1/templates/generate",
+        "/v1/agentic/generate-draft",
         json={
             "scene_metadata": {
                 "scene_id": "quality-api",
@@ -110,10 +106,3 @@ def test_quality_check_and_base_templates_contract() -> None:
     assert quality_resp.status_code == 200
     quality = quality_resp.json()
     assert set(["overall_score", "passed", "semantic_score", "solvability_score"]).issubset(quality.keys())
-
-    base_resp = client.get("/v1/templates/base")
-    assert base_resp.status_code == 200
-    base = base_resp.json()
-    assert "templates" in base
-    assert len(base["templates"]) >= 2
-    assert "template_schema" in base

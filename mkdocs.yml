@@ -1,5 +1,5 @@
 site_name: EasyShift-MaaS Documentation
-site_description: Migration-centric Agentic + reusable prediction-optimization framework for industrial MaaS scenarios
+site_description: LLM-driven multi-agent migration pipeline for industrial prediction-optimization
 site_url: https://shunyuwu-shaun.github.io/EasyShift-MaaS/
 repo_url: https://github.com/ShunyuWu-Shaun/EasyShift-MaaS
 repo_name: ShunyuWu-Shaun/EasyShift-MaaS
@@ -41,7 +41,7 @@ nav:
       - 架构与运行逻辑: concepts/architecture.md
       - 迁移草案定义: concepts/migration-draft.md
       - 模板正确性与质量门禁: concepts/template-quality.md
-      - 术语表（去抽象化）: concepts/glossary.md
+      - 术语表: concepts/glossary.md
   - 教程:
       - 标准YAML工业流程: tutorials/industrial-standard-yaml.md
       - Legacy YAML迁移: tutorials/legacy-yaml-migration.md
@@ -59,4 +59,8 @@ nav:
       - Nuitka打包: deployment/nuitka.md
       - 安全基线: deployment/security-baseline.md
   - FAQ: faq.md
+  - 迁移说明: MIGRATION_GUIDE.md
   - 路线图: roadmap.md
+  - 索引兼容:
+      - API索引页: API.md
+      - 架构索引页: ARCHITECTURE.md
